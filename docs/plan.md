@@ -268,11 +268,11 @@ com.transportes
   - [x] `ConexionBD.java`: carga desde `config.properties`, devuelve `Connection`
   - [x] Verificación: `mvn -q verify` compila
 
-- [ ] **Etapa 3 · Capa Model**
-  - [ ] Enums `TipoVehiculo`, `TipoMercancia`, `TipoCliente`
-  - [ ] Jerarquías Vehiculo, Mercancia, Cliente (abstract + concretas); todos los campos monetarios como `BigDecimal`
-  - [ ] `Supervisor`, `Envio`, excepciones de dominio
-  - [ ] Verificación: `mvn -q verify`
+- [x] **Etapa 3 · Capa Model**
+  - [x] Enums `TipoVehiculo`, `TipoMercancia`, `TipoCliente`
+  - [x] Jerarquías Vehiculo, Mercancia, Cliente (abstract + concretas); todos los campos monetarios como `BigDecimal`
+  - [x] `Supervisor`, `Envio`, excepciones de dominio
+  - [x] Verificación: `mvn -q verify`
 
 - [ ] **Etapa 4 · Capa DAO**
   - [ ] Interfaces + implementaciones JDBC para las 5 entidades
