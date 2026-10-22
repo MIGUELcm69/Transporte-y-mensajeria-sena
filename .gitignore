@@ -1,0 +1,15 @@
+# Compilación
+target/
+
+# IntelliJ
+.idea/
+*.iml
+out/
+
+# Credenciales y configuración local
+config.properties
+.env
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
