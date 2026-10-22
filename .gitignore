@@ -9,6 +9,7 @@ out/
 # Credenciales y configuración local
 config.properties
 .env
+sql/*.local.sql
 
 # Sistema operativo
 .DS_Store

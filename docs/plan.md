@@ -247,9 +247,9 @@ com.transportes
 
 ## 5. Etapas verificables
 
-- [ ] **Etapa 0 · Verificación de compilación**
-  - [ ] Ejecutar `mvn -q verify`; si falla por `junit-jupiter`, corregir a versión disponible y documentar
-  - [ ] Confirmar versión de `mysql-connector-j`
+- [x] **Etapa 0 · Verificación de compilación**
+  - [x] Ejecutar `mvn -q verify`; si falla por `junit-jupiter`, corregir a versión disponible y documentar
+  - [x] Confirmar versión de `mysql-connector-j`
 
 - [ ] **Etapa 1 · Esquema de BD**
   - [ ] `sql/schema.sql`: tablas en orden de dependencia (supervisor → vehiculo → cliente → mercancia → envio), con DROP TABLE IF EXISTS en orden inverso al inicio
