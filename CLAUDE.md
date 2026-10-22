@@ -39,3 +39,6 @@ Reglas de diseño:
 - Al terminar cada etapa: compila (`mvn -q verify`), ejecuta los tests y lista qué asumiste.
 - Comentarios solo donde la complejidad lo exija; nombres descriptivos en español de dominio.
 - Entregables: script `sql/schema.sql` reproducible (RNF-17), diagrama de clases y manual de uso (RNF-13).
+
+Verificación: la hago yo desde IntelliJ (Maven → verify). No ejecutes mvn en la terminal.
+No explores .idea/, .git/ ni target/. Lee solo los archivos que se te indiquen con @.

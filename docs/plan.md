@@ -251,22 +251,22 @@ com.transportes
   - [x] Ejecutar `mvn -q verify`; si falla por `junit-jupiter`, corregir a versión disponible y documentar
   - [x] Confirmar versión de `mysql-connector-j`
 
-- [ ] **Etapa 1 · Esquema de BD**
-  - [ ] `sql/schema.sql`: tablas en orden de dependencia (supervisor → vehiculo → cliente → mercancia → envio), con DROP TABLE IF EXISTS en orden inverso al inicio
-  - [ ] CHECK de subtipos en vehiculo, cliente, mercancia (subtipo + largo_recorrido)
-  - [ ] CHECK `cliente_origen_id <> destinatario_id` en envio
-  - [ ] FKs con ON DELETE RESTRICT en todas las relaciones
-  - [ ] UNIQUE: vehiculo.codigo, cliente.codigo_cliente, cliente.nif, cliente.cif, mercancia.codigo, envio.mercancia_id
-  - [ ] Triggers: `trg_vehiculo_tipo_bu`, `trg_mercancia_bi`, `trg_mercancia_bu`
-  - [ ] `sql/usuario.sql`: `CREATE USER 'transportes_app'@'localhost' IDENTIFIED BY 'CAMBIAR_ESTA_CLAVE'`; GRANT SELECT, INSERT, UPDATE, DELETE sobre el schema (sin DDL ni SUPER); contraseña real documentada en `config.properties.example`
-  - [ ] `sql/seed.sql`: ≥1 supervisor, ≥1 de cada tipo de vehículo, ≥1 de cada tipo de cliente, ≥1 mercancía de cada tipo con y sin largo_recorrido, ≥1 envío a particular (con intentos) y a empresa
-  - [ ] Verificación: cargar los tres scripts en MySQL Workbench con usuario `transportes_app`, confirmar 0 errores
+- [x] **Etapa 1 · Esquema de BD**
+  - [x] `sql/schema.sql`: tablas en orden de dependencia (supervisor → vehiculo → cliente → mercancia → envio), con DROP TABLE IF EXISTS en orden inverso al inicio
+  - [x] CHECK de subtipos en vehiculo, cliente, mercancia (subtipo + largo_recorrido)
+  - [x] CHECK `cliente_origen_id <> destinatario_id` en envio
+  - [x] FKs con ON DELETE RESTRICT en todas las relaciones
+  - [x] UNIQUE: vehiculo.codigo, cliente.codigo_cliente, cliente.nif, cliente.cif, mercancia.codigo, envio.mercancia_id
+  - [x] Triggers: `trg_vehiculo_tipo_bu`, `trg_mercancia_bi`, `trg_mercancia_bu`
+  - [x] `sql/usuario.sql`: `CREATE USER 'transportes_app'@'localhost' IDENTIFIED BY 'CAMBIAR_ESTA_CLAVE'`; GRANT SELECT, INSERT, UPDATE, DELETE sobre el schema (sin DDL ni SUPER); contraseña real documentada en `config.properties.example`
+  - [x] `sql/seed.sql`: ≥1 supervisor, ≥1 de cada tipo de vehículo, ≥1 de cada tipo de cliente, ≥1 mercancía de cada tipo con y sin largo_recorrido, ≥1 envío a particular (con intentos) y a empresa
+  - [x] Verificación: cargar los tres scripts en MySQL Workbench con usuario `transportes_app`, confirmar 0 errores
 
-- [ ] **Etapa 2 · Config y conexión**
-  - [ ] `src/main/resources/config.properties.example` con claves `db.url`, `db.usuario`, `db.password` (sin valores reales; nota sobre `CAMBIAR_ESTA_CLAVE` de `usuario.sql`)
-  - [ ] Confirmar `config.properties` en `.gitignore`
-  - [ ] `ConexionBD.java`: carga desde `config.properties`, devuelve `Connection`
-  - [ ] Verificación: `mvn -q verify` compila
+- [x] **Etapa 2 · Config y conexión**
+  - [x] `src/main/resources/config.properties.example` con claves `db.url`, `db.usuario`, `db.password` (sin valores reales; nota sobre `CAMBIAR_ESTA_CLAVE` de `usuario.sql`)
+  - [x] Confirmar `config.properties` en `.gitignore`
+  - [x] `ConexionBD.java`: carga desde `config.properties`, devuelve `Connection`
+  - [x] Verificación: `mvn -q verify` compila
 
 - [ ] **Etapa 3 · Capa Model**
   - [ ] Enums `TipoVehiculo`, `TipoMercancia`, `TipoCliente`

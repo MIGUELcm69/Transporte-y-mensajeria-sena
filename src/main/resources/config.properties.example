@@ -1,0 +1,17 @@
+# Configuración de conexión a la base de datos.
+# Copia este archivo como config.properties en la misma carpeta y rellena los valores reales.
+# NUNCA subas config.properties al repositorio (está en .gitignore).
+#
+# Las variables de entorno DB_URL, DB_USUARIO y DB_PASSWORD tienen prioridad
+# sobre las claves de este archivo si están definidas en el sistema.
+
+# URL JDBC de la base de datos.
+# Ejemplo: jdbc:mysql://localhost:3306/transportes
+db.url=jdbc:mysql://localhost:3306/transportes
+
+# Usuario de la base de datos (creado en sql/usuario.sql).
+db.usuario=transportes_app
+
+# Contraseña del usuario.
+# Sustituye CAMBIAR_ESTA_CLAVE por la contraseña real que usaste en sql/usuario.sql.
+db.password=CAMBIAR_ESTA_CLAVE
