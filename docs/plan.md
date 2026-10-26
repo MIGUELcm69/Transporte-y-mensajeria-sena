@@ -20,7 +20,7 @@
 | Columna | Tipo | Restricciones |
 |---|---|---|
 | `id` | INT | PK AUTO_INCREMENT |
-| `nif` | VARCHAR(9) | UNIQUE NOT NULL |
+| `nif` | VARCHAR(20) | UNIQUE NOT NULL |
 | `nombre` | VARCHAR(100) | NOT NULL |
 | `direccion` | VARCHAR(200) | NOT NULL |
 | `telefono` | VARCHAR(15) | NOT NULL |
@@ -56,18 +56,26 @@ CHECK (
 | `fecha_alta` | DATE | NOT NULL |
 | `total_facturado` | DECIMAL(14,2) | NOT NULL DEFAULT 0.00, CHECK (total_facturado >= 0) |
 | `tipo` | ENUM('PARTICULAR','EMPRESA') | NOT NULL |
-| `nif` | VARCHAR(9) | NULL, UNIQUE |
-| `cif` | VARCHAR(9) | NULL, UNIQUE |
+| `nif` | VARCHAR(20) | NULL, UNIQUE |
+| `cif` | VARCHAR(20) | NULL, UNIQUE |
 | `nombre` | VARCHAR(100) | NOT NULL |
 | `direccion` | VARCHAR(200) | NOT NULL |
-| `telefono` | VARCHAR(15) | NULL |
+| `telefono` | VARCHAR(15) | NULL (obligatorio para EMPRESA) |
+
+*NIF/CIF admiten 20 caracteres (p. ej. un NIT colombiano `900123456-7` mide 11); `Validacion.LONGITUD_DOCUMENTO = 20`.*
+
+**Trigger de inmutabilidad:** `trg_cliente_tipo_bu` (BEFORE UPDATE) — señala error si `NEW.tipo <> OLD.tipo`.
 
 *UNIQUE(nif) y UNIQUE(cif): MySQL permite múltiples NULL en un índice UNIQUE, por lo que solo restringe valores no nulos.*
+
+*`telefono` es obligatorio para EMPRESA: lo exigen el CHECK `chk_cliente_subtipo` y el modelo (`ClienteEmpresa`). La columna admite NULL porque PARTICULAR no lo tiene.*
+
+*`fecha_alta` la pone el controlador con `LocalDate.now()` al registrar el cliente; el modelo la exige no nula (P-07).*
 
 ```sql
 CHECK (
   (tipo = 'PARTICULAR' AND nif IS NOT NULL AND cif IS NULL) OR
-  (tipo = 'EMPRESA'    AND cif IS NOT NULL AND nif IS NULL)
+  (tipo = 'EMPRESA'    AND cif IS NOT NULL AND nif IS NULL AND telefono IS NOT NULL)
 )
 ```
 
@@ -128,18 +136,29 @@ CHECK (
 CHECK (cliente_origen_id <> destinatario_id)
 ```
 
+**Trigger RF-30** `trg_envio_bi` / `trg_envio_bu` (BEFORE INSERT/UPDATE): señala error si el destinatario es EMPRESA e `intentos_fallidos > 0`.
+
 ---
 
 ## 2. Triggers vs Controlador
 
-### Triggers (solo reglas que requieren subquery entre tablas)
+### Triggers (inmutabilidad y reglas que requieren consultar otra tabla)
+
+Seis triggers en `sql/schema.sql`:
 
 | Trigger | Valida | RF |
 |---|---|---|
-| `trg_vehiculo_tipo_bu` BEFORE UPDATE | `NEW.tipo = OLD.tipo` siempre | inmutabilidad |
-| `trg_mercancia_bi/bu` BEFORE INSERT/UPDATE | `vehiculo_id` es MOTO/FURGONETA según tipo | RF-21 |
-| | `avion_id` apunta a tipo='AVION' cuando NOT NULL | RF-25 |
-| | `vehiculo_destino_id` es MOTO/FURGONETA según tipo cuando NOT NULL | RF-21+RF-24 |
+| `trg_vehiculo_tipo_bu` BEFORE UPDATE | `NEW.tipo = OLD.tipo` siempre | RF-02, inmutabilidad |
+| `trg_cliente_tipo_bu` BEFORE UPDATE | `NEW.tipo = OLD.tipo` siempre | inmutabilidad |
+| `trg_mercancia_bi` / `trg_mercancia_bu` BEFORE INSERT/UPDATE | llaman a `sp_validar_mercancia` (ver abajo) | RF-21, RF-24, RF-25 |
+| `trg_envio_bi` / `trg_envio_bu` BEFORE INSERT/UPDATE | destinatario EMPRESA ⇒ `intentos_fallidos = 0` | RF-30 |
+
+**Procedimiento `sp_validar_mercancia(tipo, vehiculo_id, avion_id, vehiculo_destino_id)`**, compartido por `trg_mercancia_bi/bu`:
+- `vehiculo_id` es MOTO si tipo='SOBRE', FURGONETA si tipo='PAQUETE' (RF-21)
+- `avion_id` apunta a tipo='AVION' cuando NOT NULL (RF-25)
+- `vehiculo_destino_id` es MOTO/FURGONETA según tipo cuando NOT NULL (RF-21 + RF-24)
+
+Los mensajes de `SIGNAL` están pensados para el usuario final (sin nombres de columna ni términos técnicos); el DAO los pasa tal cual en `ReglaAsignacionException`.
 
 Las demás restricciones (subtipos, largo_recorrido ↔ avion_id) van en CHECK de definición de tabla.
 
@@ -155,8 +174,10 @@ Las demás restricciones (subtipos, largo_recorrido ↔ avion_id) van en CHECK d
 | Eliminar envío: `UPDATE cliente SET total_facturado = total_facturado - ? WHERE id = cliente_origen_id` | RF-17 |
 | Modificar `precio_total` de un envío (mismo cliente): `total_facturado + (nuevo - viejo)` atómico | RF-17 |
 | Modificar `cliente_origen_id` de un envío: restar del cliente anterior y sumar al nuevo en la misma transacción | RF-17 |
-| Registrar intento fallido: recalcular `precio_total`, ajustar `total_facturado` con la diferencia | RF-33 |
-| Calcular `precio_total` y `plusAlmacenaje` con `BigDecimal.setScale(2, HALF_UP)` | RF-31/RF-32 |
+| Registrar intento fallido: obtener el envío recalculado con `Envio.conIntentoFallido`, ajustar `total_facturado` con la diferencia | RF-33 |
+| Invocar el cálculo de plus y `precio_total`, que vive en `Envio` (`calcularPlus`, `calcularPrecioTotal`, `nuevo`, `conIntentoFallido`); el controlador no calcula | RF-31/RF-32 |
+| Poner `fecha_alta = LocalDate.now()` al registrar un cliente | P-07 |
+| Validar tipos de vehículo (sobre → moto, paquete → furgoneta, avión) antes de guardar, para dar un mensaje claro | RF-21/RF-24/RF-25 |
 | Contar aviones por supervisor (query derivada) | RF-10 |
 
 **Actualización atómica de `total_facturado`:**
@@ -173,7 +194,8 @@ UPDATE cliente SET total_facturado = total_facturado + ? WHERE id = ?  -- ? = -p
 
 ## 3. Dinero y redondeo
 
-Todas las operaciones monetarias en Java usan `BigDecimal` con escala 2 y `RoundingMode.HALF_UP`:
+Todas las operaciones monetarias en Java usan `BigDecimal` con escala 2 y `RoundingMode.HALF_UP`.
+El cálculo del plus y del precio total está en `Envio` (`calcularPlus`, `calcularPrecioTotal`); `EnvioController` solo lo invoca:
 
 ```java
 BigDecimal factor = new BigDecimal("0.04")
@@ -208,11 +230,15 @@ com.transportes
 │   ├── ClienteEmpresa.java          # + cif, telefono: String
 │   ├── TipoCliente.java             # enum PARTICULAR, EMPRESA
 │   ├── Supervisor.java
-│   ├── Envio.java                   # clienteOrigenId, destinatarioId, mercanciaId, fechaEnvio, intentosFallidos, precioTotal
+│   ├── Envio.java                   # clienteOrigenId, destinatarioId, mercanciaId, fechaEnvio, intentosFallidos, precioTotal;
+│   │                                #   calcularPlus, calcularPrecioTotal, nuevo, conIntentoFallido
+│   ├── Validacion.java              # interna del paquete: invariantes (textos, longitudes, importes, medidas, ids)
 │   └── dao/
-│       ├── VehiculoDao.java         # Interface: save, update, delete, findById, findByCodigo, findByTipo, findBySupervisor, findAll
+│       ├── SoporteJdbc.java         # interna: conexión propia/externa, PreparedStatement, try-with-resources
+│       ├── TraductorErroresSql.java # interna: SQLException → excepción con mensaje para el usuario + log
+│       ├── VehiculoDao.java         # Interface: save, update, delete, findById, findByCodigo, findByTipo, findBySupervisor, findAll, contarPorSupervisor, tieneMercancias
 │       ├── VehiculoDaoImpl.java
-│       ├── SupervisorDao.java       # Interface: save, update, delete, findById, findByNif, findAll, findConVehiculos
+│       ├── SupervisorDao.java       # Interface: save, update, delete, findById, findByNif, findAll, contarAviones
 │       ├── SupervisorDaoImpl.java
 │       ├── ClienteDao.java          # Interface: save, update, delete, findById, findByCodigo, findAll, sumarTotalFacturado
 │       ├── ClienteDaoImpl.java
@@ -225,7 +251,7 @@ com.transportes
 │   ├── SupervisorController.java    # transacción supervisor+vehiculo
 │   ├── ClienteController.java
 │   ├── MercanciaController.java     # incluye guard de precio_envio si hay envío
-│   └── EnvioController.java        # cálculo plus+precio, transacción total_facturado (crear/modificar/eliminar/intentos)
+│   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
 ├── view/
 │   ├── MenuPrincipal.java
 │   ├── Consola.java                 # leerInt, leerDecimal, leerFecha, leerTextoNoVacio
@@ -236,12 +262,29 @@ com.transportes
 │   └── EnvioView.java
 └── exception/
     ├── DomainException.java         # Base unchecked
+    ├── DatoInvalidoException.java   # invariantes del modelo, CHECK (3819), fuera de rango (1264)
     ├── VehiculoEnUsoException.java
     ├── SupervisorConVehiculosException.java
     ├── MercanciaConEnvioException.java
     ├── ReglaAsignacionException.java
-    └── EntidadNoEncontradaException.java
+    ├── EntidadNoEncontradaException.java
+    ├── RegistroDuplicadoException.java  # UNIQUE violado (1062), mensaje según la restricción
+    ├── ClienteConEnviosException.java   # borrar cliente con envíos (1451 sobre fk_envio_origen/destinatario)
+    ├── ConfiguracionException.java  # infraestructura; hereda de RuntimeException, no de DomainException
+    └── AccesoDatosException.java    # infraestructura; hereda de RuntimeException; errores de BD no previstos, 1205, 1213
 ```
+
+**Traducción de `SQLException` en el DAO** (detalle técnico al log con `java.util.logging`; nunca el mensaje crudo de MySQL):
+
+| Código MySQL | Excepción |
+|---|---|
+| 1062 duplicado | `RegistroDuplicadoException` (mensaje según `uq_*`; genérico si no se reconoce) |
+| 3819 CHECK | `DatoInvalidoException` |
+| 1644 SIGNAL de trigger | `ReglaAsignacionException` con el mensaje del trigger |
+| 1451 FK RESTRICT | según la FK: `fk_vehiculo_supervisor` → `SupervisorConVehiculosException`; `fk_mercancia_*` → `VehiculoEnUsoException`; `fk_envio_mercancia` → `MercanciaConEnvioException`; `fk_envio_origen/destinatario` → `ClienteConEnviosException` |
+| 1452 FK inexistente | `DatoInvalidoException` |
+| 1264 fuera de rango | `DatoInvalidoException` |
+| 1205, 1213 y resto | `AccesoDatosException` (mensaje genérico) |
 
 ---
 
@@ -257,7 +300,7 @@ com.transportes
   - [x] CHECK `cliente_origen_id <> destinatario_id` en envio
   - [x] FKs con ON DELETE RESTRICT en todas las relaciones
   - [x] UNIQUE: vehiculo.codigo, cliente.codigo_cliente, cliente.nif, cliente.cif, mercancia.codigo, envio.mercancia_id
-  - [x] Triggers: `trg_vehiculo_tipo_bu`, `trg_mercancia_bi`, `trg_mercancia_bu`
+  - [x] Triggers: `trg_vehiculo_tipo_bu`, `trg_cliente_tipo_bu`, `trg_mercancia_bi`, `trg_mercancia_bu`, `trg_envio_bi`, `trg_envio_bu`; procedimiento `sp_validar_mercancia`
   - [x] `sql/usuario.sql`: `CREATE USER 'transportes_app'@'localhost' IDENTIFIED BY 'CAMBIAR_ESTA_CLAVE'`; GRANT SELECT, INSERT, UPDATE, DELETE sobre el schema (sin DDL ni SUPER); contraseña real documentada en `config.properties.example`
   - [x] `sql/seed.sql`: ≥1 supervisor, ≥1 de cada tipo de vehículo, ≥1 de cada tipo de cliente, ≥1 mercancía de cada tipo con y sin largo_recorrido, ≥1 envío a particular (con intentos) y a empresa
   - [x] Verificación: cargar los tres scripts en MySQL Workbench con usuario `transportes_app`, confirmar 0 errores
@@ -274,29 +317,35 @@ com.transportes
   - [x] `Supervisor`, `Envio`, excepciones de dominio
   - [x] Verificación: `mvn -q verify`
 
-- [ ] **Etapa 4 · Capa DAO**
-  - [ ] Interfaces + implementaciones JDBC para las 5 entidades
-  - [ ] `PreparedStatement` en todo; `try-with-resources` en todos los métodos
-  - [ ] Mapeo ResultSet → objeto con factory por tipo (STI)
-  - [ ] `MercanciaDao.tieneEnvio(int mercanciaId)` para el guard de precio_envio
-  - [ ] `ClienteDao.sumarTotalFacturado(int clienteId, BigDecimal delta, Connection)` con SQL atómico
-  - [ ] Verificación: `mvn -q verify` + test de conexión manual
+- [ x] **Etapa 4 · Capa DAO**
+  - [x] Interfaces + implementaciones JDBC para las 5 entidades
+  - [x] `PreparedStatement` en todo; `try-with-resources` en todos los métodos
+  - [x] Sobrecarga con `Connection` externa en cada método que escribe (sin commit/rollback/close)
+  - [x] Mapeo ResultSet → objeto con factory por tipo (STI)
+  - [x] `MercanciaDao.tieneEnvio(int mercanciaId)` para el guard de precio_envio
+  - [x] `ClienteDao.sumarTotalFacturado(int clienteId, BigDecimal delta, Connection)` con SQL atómico
+  - [x] Traducción de `SQLException` (1062, 3819, 1644, 1451, 1452, 1264, resto) con log `java.util.logging`
+  - [x ] Verificación: `mvn -q verify` + test de conexión manual
 
 - [ ] **Etapa 5 · Capa Controller**
   - [ ] CRUD por módulo; guards de eliminación (RF-06, RF-11)
   - [ ] Guard en `MercanciaController`: rechaza modificar `precio_envio` si `tieneEnvio = true`
   - [ ] Transacción atómica supervisor + primer vehículo
-  - [ ] `EnvioController.crear`: calcular `precioTotal`, `sumarTotalFacturado(+delta)`, todo en una transacción
+  - [ ] `EnvioController.crear`: obtener el envío con `Envio.nuevo` (calcula `precioTotal`), `sumarTotalFacturado(+delta)`, todo en una transacción
   - [ ] `EnvioController.modificar`: manejar cambio de `cliente_origen_id` (restar viejo, sumar nuevo) y cambio de `precio_total` (sumar diferencia)
   - [ ] `EnvioController.eliminar`: `sumarTotalFacturado(-precioTotal)` en la misma transacción
-  - [ ] `EnvioController.registrarIntentoFallido`: recalcular `precioTotal`, ajustar diferencia en `total_facturado`
+  - [ ] `EnvioController.registrarIntentoFallido`: obtener el envío con `Envio.conIntentoFallido`, ajustar diferencia en `total_facturado`
+  - [ ] `ClienteController.registrar`: `fecha_alta = LocalDate.now()`
   - [ ] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
+  - [ ] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
   - [ ] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
 
 - [ ] **Etapa 6 · Capa View**
   - [ ] `Consola.java`: validación de tipos, fechas, rangos; nunca se propaga excepción al menú
   - [ ] Menú principal + submenús por módulo (RF-38/RF-39)
   - [ ] Mensajes de éxito/error sin stack traces; detalle a log
+  - [ ] Configurar `java.util.logging` para escribir en archivo y no en consola (por defecto, `ConsoleHandler` imprime WARNING/SEVERE con stack trace en stderr)
+  - [ ] Capturar por separado `ConfiguracionException` y `AccesoDatosException` (no heredan de `DomainException`)
   - [ ] Verificación: prueba manual de flujo completo
 
 - [ ] **Etapa 7 · Reportes**
@@ -322,9 +371,9 @@ com.transportes
 | P-04 | RF-29 = FK obligatoria `cliente_origen_id NOT NULL`. Sin precondición adicional de creación. |
 | P-05 | `envio.destinatario_id FK → cliente(id)`. El destinatario debe estar registrado como cliente. |
 | P-06 | UNIQUE sobre `envio.mercancia_id` (relación 1:1). |
-| P-07 | `fecha_alta DATE NOT NULL`, valor por defecto la fecha actual al registrar. |
+| P-07 | `fecha_alta DATE NOT NULL`. La pone el controlador con `LocalDate.now()` al registrar; el modelo no aplica valor por defecto. |
 | P-08 | `asegurada` solo informativa; sin impacto en cálculos; se muestra en listados. |
-| P-09 | RF-23/RF-25 (largo_recorrido ↔ avion_id) → CHECK en tabla. RF-21/RF-24 (tipos cruzados) → triggers en `mercancia`. Validación redundante en controller para mensajes amigables. |
+| P-09 | RF-23/RF-24 (largo recorrido exige avión y vehículo de destino) → CHECK en tabla + modelo (`Mercancia.asignarVehiculos`). Tipos de vehículo RF-21/RF-24/RF-25 (sobre → moto, paquete → furgoneta, avión → AVION) → triggers en `mercancia` + controlador para mensajes claros. |
 
 ---
 

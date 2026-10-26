@@ -141,7 +141,7 @@ VALUES
 -- Prueba 12: largo recorrido con avion_id apuntando a una moto (RF-25)
 -- Viola: trg_mercancia_bi → sp_validar_mercancia
 --   avion_id=1 es MOTO, pero debe ser AVION
--- Esperado: SQLSTATE '45000' "avion_id debe referenciar un avión"
+-- Esperado: SQLSTATE '45000' "La mercancía de largo recorrido debe asignarse a un avión"
 -- (El CHECK chk_mercancia_largo_recorrido no falla porque avion_id IS NOT NULL
 --  y vehiculo_destino_id IS NOT NULL; la validación cruzada recae en el trigger.)
 -- ============================================================

@@ -41,4 +41,4 @@ Reglas de diseño:
 - Entregables: script `sql/schema.sql` reproducible (RNF-17), diagrama de clases y manual de uso (RNF-13).
 
 Verificación: la hago yo desde IntelliJ (Maven → verify). No ejecutes mvn en la terminal.
-No explores .idea/, .git/ ni target/. Lee solo los archivos que se te indiquen con @.
+Puedes leer libremente src/, sql/ y docs/. No explores .idea/, .git/ ni target/.

@@ -16,7 +16,7 @@ final class Validacion {
     static final int LONGITUD_NOMBRE = 100;
     static final int LONGITUD_DIRECCION = 200;
     static final int LONGITUD_TELEFONO = 15;
-    static final int LONGITUD_DOCUMENTO = 9;
+    static final int LONGITUD_DOCUMENTO = 20;
 
     private Validacion() {
     }

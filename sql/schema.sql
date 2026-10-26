@@ -184,7 +184,7 @@ BEGIN
         SELECT tipo INTO v_tipo FROM vehiculo WHERE id = p_avion_id;
         IF v_tipo <> 'AVION' THEN
             SIGNAL SQLSTATE '45000'
-                SET MESSAGE_TEXT = 'avion_id debe referenciar un avión';
+                SET MESSAGE_TEXT = 'La mercancía de largo recorrido debe asignarse a un avión';
         END IF;
     END IF;
 
