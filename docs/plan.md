@@ -214,7 +214,7 @@ Columnas `DECIMAL(x,2)` en BD: la escala Java siempre coincide con la BD.
 com.transportes
 ├── Main.java
 ├── config/
-│   └── ConexionBD.java              # Singleton; carga config.properties; try-with-resources
+│   └── ConexionBD.java              # Utilidad estática, no Singleton: carga la configuración (entorno o config.properties) al llamar a getConnection()
 ├── model/
 │   ├── Vehiculo.java                # Abstract
 │   ├── Moto.java                    # + cilindrada: BigDecimal
@@ -247,8 +247,12 @@ com.transportes
 │       ├── EnvioDao.java            # Interface: save, update, delete, findById, findByCliente, findAll, actualizarIntentos
 │       └── EnvioDaoImpl.java
 ├── controller/
-│   ├── VehiculoController.java
-│   ├── SupervisorController.java    # transacción supervisor+vehiculo
+│   ├── Transacciones.java           # Interface: ejecutar(TrabajoTransaccional) con commit/rollback
+│   ├── TransaccionesJdbc.java       # Connection con autoCommit=false; SQLException de conexión/commit → AccesoDatosException
+│   ├── TrabajoTransaccional.java    # Interface funcional: T ejecutar(Connection), sin SQLException (los DAO ya la traducen)
+│   ├── FichaSupervisor.java         # record: supervisor + vehículos a cargo + numeroAviones() (RF-10, RF-12)
+│   ├── VehiculoController.java      # guards RF-06 y RF-13 (último vehículo) al eliminar o reasignar
+│   ├── SupervisorController.java    # transacción supervisor + primer vehículo; eliminar / eliminarTraspasandoVehiculos
 │   ├── ClienteController.java
 │   ├── MercanciaController.java     # incluye guard de precio_envio si hay envío
 │   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
@@ -270,6 +274,7 @@ com.transportes
     ├── EntidadNoEncontradaException.java
     ├── RegistroDuplicadoException.java  # UNIQUE violado (1062), mensaje según la restricción
     ├── ClienteConEnviosException.java   # borrar cliente con envíos (1451 sobre fk_envio_origen/destinatario)
+    ├── UltimoVehiculoException.java     # eliminar o reasignar el último vehículo de un supervisor (RF-13)
     ├── ConfiguracionException.java  # infraestructura; hereda de RuntimeException, no de DomainException
     └── AccesoDatosException.java    # infraestructura; hereda de RuntimeException; errores de BD no previstos, 1205, 1213
 ```
@@ -317,7 +322,7 @@ com.transportes
   - [x] `Supervisor`, `Envio`, excepciones de dominio
   - [x] Verificación: `mvn -q verify`
 
-- [ x] **Etapa 4 · Capa DAO**
+- [x] **Etapa 4 · Capa DAO**
   - [x] Interfaces + implementaciones JDBC para las 5 entidades
   - [x] `PreparedStatement` en todo; `try-with-resources` en todos los métodos
   - [x] Sobrecarga con `Connection` externa en cada método que escribe (sin commit/rollback/close)
@@ -325,7 +330,7 @@ com.transportes
   - [x] `MercanciaDao.tieneEnvio(int mercanciaId)` para el guard de precio_envio
   - [x] `ClienteDao.sumarTotalFacturado(int clienteId, BigDecimal delta, Connection)` con SQL atómico
   - [x] Traducción de `SQLException` (1062, 3819, 1644, 1451, 1452, 1264, resto) con log `java.util.logging`
-  - [x ] Verificación: `mvn -q verify` + test de conexión manual
+  - [x] Verificación: `mvn -q verify` + test de conexión manual
 
 - [ ] **Etapa 5 · Capa Controller**
   - [ ] CRUD por módulo; guards de eliminación (RF-06, RF-11)
@@ -338,7 +343,14 @@ com.transportes
   - [ ] `ClienteController.registrar`: `fecha_alta = LocalDate.now()`
   - [ ] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
   - [ ] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
+  - [ ] Bloquear eliminar o reasignar a otro supervisor el último vehículo de un supervisor (P-01, RF-13)
+  - [ ] `MercanciaController`: validar los tipos de vehículo (sobre → moto, paquete → furgoneta, avión → AVION) antes de guardar, para dar un mensaje claro (RF-21/RF-24/RF-25)
+  - [ ] `SupervisorController`: exponer el conteo de aviones por supervisor (RF-10)
+  - [ ] `SupervisorController.eliminarTraspasandoVehiculos(id, supervisorDestinoId)`: destino existente y distinto; mover vehículos y borrar en una transacción. `eliminar(id)` solo para supervisores sin vehículos (RF-11, RF-13)
+  - [ ] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`
   - [ ] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
+    - Reglas de los controladores: con DAO falsos en memoria que implementan las interfaces `*Dao`
+    - Transacciones: contra un esquema aparte `transportes_test`, nunca contra `transportes_db`
 
 - [ ] **Etapa 6 · Capa View**
   - [ ] `Consola.java`: validación de tipos, fechas, rangos; nunca se propaga excepción al menú
@@ -346,16 +358,20 @@ com.transportes
   - [ ] Mensajes de éxito/error sin stack traces; detalle a log
   - [ ] Configurar `java.util.logging` para escribir en archivo y no en consola (por defecto, `ConsoleHandler` imprime WARNING/SEVERE con stack trace en stderr)
   - [ ] Capturar por separado `ConfiguracionException` y `AccesoDatosException` (no heredan de `DomainException`)
+  - [ ] Crear objetos nuevos en cada intento tras un rollback: la entidad conserva el id asignado por `save` aunque la transacción se revierta (`asignarId` solo admite una asignación)
+  - [ ] `catch` final genérico para excepciones no de dominio (`IllegalArgumentException`, `IllegalStateException`, etc.): mensaje amable al usuario y detalle al log
+  - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya
   - [ ] Verificación: prueba manual de flujo completo
 
 - [ ] **Etapa 7 · Reportes**
   - [ ] RF-35: mercancías asignadas a cada vehículo
   - [ ] RF-36: envíos por cliente y total facturado
   - [ ] RF-37: mercancías largo recorrido con avión asignado
+  - [ ] `sql/consultas_control.sql`: consulta de supervisores sin vehículos a cargo (control de RF-13)
   - [ ] Verificación: consultas con datos de `seed.sql`
 
 - [ ] **Etapa 8 · Entregables finales**
-  - [ ] Diagrama de clases UML (RNF-13)
+  - [ ] Diagrama de clases UML (RNF-13): actualizar `docs/diagrama-clases.md` con los paquetes `dao` y `controller` y las excepciones añadidas desde la Etapa 3
   - [ ] Manual básico de uso (RNF-13)
   - [ ] `sql/schema.sql` final reproducible (RNF-17)
 
@@ -385,3 +401,4 @@ com.transportes
 4. Para `Sobre` largo_recorrido, `vehiculo_id` actúa como vehículo terrestre origen→aeropuerto (cumple RF-21 y RF-24 sin columna adicional).
 5. CHECK de largo_recorrido sobre columnas FK: si MySQL lo rechaza, se mueve a `trg_mercancia_bi/bu` y se indica en el script.
 6. `total_facturado` siempre se actualiza con SQL atómico incremental (`total_facturado + delta`), nunca con read-modify-write.
+7. En los controladores, comprobar una regla y después escribir (p. ej. contar los vehículos del supervisor y luego eliminar o reasignar) no es atómico. Se acepta porque es una consola de un solo usuario; la BD sigue protegiendo la integridad con FK, UNIQUE y CHECK.
