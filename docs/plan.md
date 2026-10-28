@@ -236,7 +236,7 @@ com.transportes
 │   └── dao/
 │       ├── SoporteJdbc.java         # interna: conexión propia/externa, PreparedStatement, try-with-resources
 │       ├── TraductorErroresSql.java # interna: SQLException → excepción con mensaje para el usuario + log
-│       ├── VehiculoDao.java         # Interface: save, update, delete, findById, findByCodigo, findByTipo, findBySupervisor, findAll, contarPorSupervisor, tieneMercancias
+│       ├── VehiculoDao.java         # Interface: save, update, reasignarSupervisor (un UPDATE, solo con Connection), delete, findById, findByCodigo, findByTipo, findBySupervisor, findAll, contarPorSupervisor, tieneMercancias
 │       ├── VehiculoDaoImpl.java
 │       ├── SupervisorDao.java       # Interface: save, update, delete, findById, findByNif, findAll, contarAviones
 │       ├── SupervisorDaoImpl.java
@@ -401,4 +401,4 @@ com.transportes
 4. Para `Sobre` largo_recorrido, `vehiculo_id` actúa como vehículo terrestre origen→aeropuerto (cumple RF-21 y RF-24 sin columna adicional).
 5. CHECK de largo_recorrido sobre columnas FK: si MySQL lo rechaza, se mueve a `trg_mercancia_bi/bu` y se indica en el script.
 6. `total_facturado` siempre se actualiza con SQL atómico incremental (`total_facturado + delta`), nunca con read-modify-write.
-7. En los controladores, comprobar una regla y después escribir (p. ej. contar los vehículos del supervisor y luego eliminar o reasignar) no es atómico. Se acepta porque es una consola de un solo usuario; la BD sigue protegiendo la integridad con FK, UNIQUE y CHECK.
+7. En los controladores, comprobar una regla y después escribir (p. ej. contar los vehículos del supervisor y luego eliminar o reasignar un vehículo) no es atómico. Se acepta porque es una consola de un solo usuario; la BD sigue protegiendo la integridad con FK, UNIQUE y CHECK. `eliminarTraspasandoVehiculos` no lee la lista de vehículos: los mueve con un único `UPDATE ... WHERE supervisor_id = ?` (`VehiculoDao.reasignarSupervisor`) dentro de la misma transacción que el borrado; solo la comprobación previa de que origen y destino existen queda fuera.

@@ -100,6 +100,19 @@ class SupervisorControllerTest {
     }
 
     @Test
+    void eliminarTraspasandoBorraSupervisorSinVehiculos() {
+        Supervisor origen = supervisores.sembrar("00000000Z");
+        Supervisor destino = supervisores.sembrar("11111111A");
+        Supervisor otro = supervisores.sembrar("22222222B");
+        vehiculos.sembrar(moto("M-1", otro.getId()));
+
+        assertEquals(0, controller.eliminarTraspasandoVehiculos(origen.getId(), destino.getId()));
+
+        assertTrue(supervisores.findById(origen.getId()).isEmpty());
+        assertEquals(1, vehiculos.contarPorSupervisor(otro.getId()));
+    }
+
+    @Test
     void eliminarTraspasandoRevierteLosTraspasosSiFallaElBorrado() {
         Supervisor origen = supervisores.sembrar("00000000Z");
         Supervisor destino = supervisores.sembrar("11111111A");

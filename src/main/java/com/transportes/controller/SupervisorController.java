@@ -74,18 +74,12 @@ public class SupervisorController {
         }
         buscarPorId(id);
         buscarPorId(supervisorDestinoId);
-        List<Vehiculo> vehiculos = vehiculoDao.findBySupervisor(id);
         return transacciones.ejecutar(conexion -> {
-            for (Vehiculo vehiculo : vehiculos) {
-                vehiculo.setSupervisorId(supervisorDestinoId);
-                if (!vehiculoDao.update(vehiculo, conexion)) {
-                    throw new EntidadNoEncontradaException("un vehículo", vehiculo.getId());
-                }
-            }
+            int traspasados = vehiculoDao.reasignarSupervisor(id, supervisorDestinoId, conexion);
             if (!supervisorDao.delete(id, conexion)) {
                 throw new EntidadNoEncontradaException("un supervisor", id);
             }
-            return vehiculos.size();
+            return traspasados;
         });
     }
 

@@ -87,6 +87,17 @@ final class VehiculoDaoEnMemoria implements VehiculoDao, ConInstantanea {
     }
 
     @Override
+    public int reasignarSupervisor(int origenId, int destinoId, Connection conexion) {
+        Objects.requireNonNull(conexion);
+        List<Vehiculo> aMover = findBySupervisor(origenId);
+        for (Vehiculo vehiculo : aMover) {
+            vehiculo.setSupervisorId(destinoId);
+            filas.put(vehiculo.getId(), vehiculo);
+        }
+        return aMover.size();
+    }
+
+    @Override
     public boolean delete(int id) {
         escriturasSinTransaccion++;
         return filas.remove(id) != null;

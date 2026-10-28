@@ -23,6 +23,9 @@ public interface VehiculoDao {
 
     boolean update(Vehiculo vehiculo, Connection conexion);
 
+    /** Pasa todos los vehículos de un supervisor a otro con un único UPDATE; devuelve las filas movidas. */
+    int reasignarSupervisor(int origenId, int destinoId, Connection conexion);
+
     boolean delete(int id);
 
     boolean delete(int id, Connection conexion);

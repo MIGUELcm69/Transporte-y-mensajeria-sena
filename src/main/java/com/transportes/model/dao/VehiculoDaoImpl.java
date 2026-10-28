@@ -31,6 +31,8 @@ public class VehiculoDaoImpl implements VehiculoDao {
     private static final String UPDATE =
             "UPDATE vehiculo SET descripcion = ?, fecha_compra = ?, precio_compra = ?, supervisor_id = ?,"
                     + " cilindrada = ?, capacidad = ? WHERE id = ?";
+    private static final String REASIGNAR_SUPERVISOR =
+            "UPDATE vehiculo SET supervisor_id = ? WHERE supervisor_id = ?";
     private static final String DELETE = "DELETE FROM vehiculo WHERE id = ?";
     private static final String CONTAR_POR_SUPERVISOR = "SELECT COUNT(*) FROM vehiculo WHERE supervisor_id = ?";
     private static final String TIENE_MERCANCIAS =
@@ -55,6 +57,15 @@ public class VehiculoDaoImpl implements VehiculoDao {
     @Override
     public boolean update(Vehiculo vehiculo, Connection conexion) {
         return SoporteJdbc.conConexionExterna(conexion, "actualizar vehículo", c -> actualizar(vehiculo, c));
+    }
+
+    @Override
+    public int reasignarSupervisor(int origenId, int destinoId, Connection conexion) {
+        return SoporteJdbc.conConexionExterna(conexion, "reasignar vehículos de supervisor",
+                c -> SoporteJdbc.modificar(c, REASIGNAR_SUPERVISOR, s -> {
+                    s.setInt(1, destinoId);
+                    s.setInt(2, origenId);
+                }));
     }
 
     @Override
