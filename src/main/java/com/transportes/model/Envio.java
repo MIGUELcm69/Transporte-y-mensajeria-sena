@@ -35,7 +35,7 @@ public class Envio {
         this.mercanciaId = Validacion.id(mercanciaId, "mercancía");
         this.fechaEnvio = Validacion.obligatorio(fechaEnvio, "fecha de envío");
         this.intentosFallidos = Validacion.noNegativo(intentosFallidos, "intentos fallidos");
-        this.precioTotal = Validacion.importe(precioTotal, "precio total");
+        this.precioTotal = Validacion.importe(precioTotal, "precio total", Validacion.PRECIO);
     }
 
     /** Crea un envío nuevo, sin intentos fallidos, con el precio total ya calculado. */
@@ -79,7 +79,7 @@ public class Envio {
     }
 
     private static BigDecimal plus(BigDecimal precioEnvio, TipoCliente tipoDestinatario, int intentos) {
-        BigDecimal precio = Validacion.importe(precioEnvio, "precio de envío");
+        BigDecimal precio = Validacion.importe(precioEnvio, "precio de envío", Validacion.PRECIO);
         if (Validacion.obligatorio(tipoDestinatario, "tipo de destinatario") != TipoCliente.PARTICULAR) {
             return BigDecimal.ZERO.setScale(2);
         }
@@ -88,7 +88,7 @@ public class Envio {
     }
 
     private static BigDecimal precioTotal(BigDecimal precioEnvio, TipoCliente tipoDestinatario, int intentos) {
-        BigDecimal precio = Validacion.importe(precioEnvio, "precio de envío");
+        BigDecimal precio = Validacion.importe(precioEnvio, "precio de envío", Validacion.PRECIO);
         return precio.add(plus(precio, tipoDestinatario, intentos)).setScale(2, RoundingMode.HALF_UP);
     }
 

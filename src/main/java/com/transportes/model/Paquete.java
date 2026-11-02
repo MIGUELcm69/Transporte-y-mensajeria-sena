@@ -23,7 +23,7 @@ public class Paquete extends Mercancia {
     }
 
     public void setLargo(BigDecimal largo) {
-        this.largo = Validacion.positivo(largo, "largo");
+        this.largo = Validacion.positivo(largo, "largo", Validacion.MEDIDA);
     }
 
     public BigDecimal getAncho() {
@@ -31,7 +31,7 @@ public class Paquete extends Mercancia {
     }
 
     public void setAncho(BigDecimal ancho) {
-        this.ancho = Validacion.positivo(ancho, "ancho");
+        this.ancho = Validacion.positivo(ancho, "ancho", Validacion.MEDIDA);
     }
 
     public BigDecimal getAlto() {
@@ -39,6 +39,6 @@ public class Paquete extends Mercancia {
     }
 
     public void setAlto(BigDecimal alto) {
-        this.alto = Validacion.positivo(alto, "alto");
+        this.alto = Validacion.positivo(alto, "alto", Validacion.MEDIDA);
     }
 }

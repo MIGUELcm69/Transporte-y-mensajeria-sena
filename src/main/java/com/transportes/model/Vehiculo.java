@@ -62,7 +62,7 @@ public abstract class Vehiculo {
     }
 
     public void setPrecioCompra(BigDecimal precioCompra) {
-        this.precioCompra = Validacion.importe(precioCompra, "precio de compra");
+        this.precioCompra = Validacion.importe(precioCompra, "precio de compra", Validacion.PRECIO);
     }
 
     public int getSupervisorId() {

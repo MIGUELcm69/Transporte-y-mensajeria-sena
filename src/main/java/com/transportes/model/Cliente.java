@@ -21,7 +21,7 @@ public abstract class Cliente {
         this.codigoCliente = Validacion.texto(codigoCliente, "código de cliente", Validacion.LONGITUD_CODIGO);
         this.tipo = Validacion.obligatorio(tipo, "tipo");
         this.fechaAlta = Validacion.obligatorio(fechaAlta, "fecha de alta");
-        this.totalFacturado = Validacion.importe(totalFacturado, "total facturado");
+        this.totalFacturado = Validacion.importe(totalFacturado, "total facturado", Validacion.TOTAL_FACTURADO);
         setNombre(nombre);
         setDireccion(direccion);
     }

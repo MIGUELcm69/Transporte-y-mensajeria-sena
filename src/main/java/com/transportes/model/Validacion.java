@@ -18,6 +18,26 @@ final class Validacion {
     static final int LONGITUD_TELEFONO = 15;
     static final int LONGITUD_DOCUMENTO = 20;
 
+    static final ColumnaDecimal PRECIO = new ColumnaDecimal(12, 2);
+    static final ColumnaDecimal TOTAL_FACTURADO = new ColumnaDecimal(14, 2);
+    static final ColumnaDecimal CILINDRADA = new ColumnaDecimal(8, 2);
+    static final ColumnaDecimal CAPACIDAD = new ColumnaDecimal(10, 2);
+    static final ColumnaDecimal PESO = new ColumnaDecimal(10, 3);
+    static final ColumnaDecimal MEDIDA = new ColumnaDecimal(10, 2);
+
+    /** Columna DECIMAL(precision, escala) de la BD; el máximo admitido se deriva de ambas. */
+    record ColumnaDecimal(int precision, int escala) {
+
+        int digitosEnteros() {
+            return precision - escala;
+        }
+
+        /** Por ejemplo, DECIMAL(12,2) → 9999999999.99. */
+        BigDecimal maximo() {
+            return BigDecimal.TEN.pow(digitosEnteros()).subtract(BigDecimal.ONE.movePointLeft(escala));
+        }
+    }
+
     private Validacion() {
     }
 
@@ -40,21 +60,32 @@ final class Validacion {
         return valor;
     }
 
-    /** Importe monetario no negativo, normalizado a escala 2 con HALF_UP. */
-    static BigDecimal importe(BigDecimal valor, String campo) {
+    /** Importe monetario no negativo, normalizado a la escala de la columna (2) con HALF_UP. */
+    static BigDecimal importe(BigDecimal valor, String campo, ColumnaDecimal columna) {
         obligatorio(valor, campo);
         if (valor.signum() < 0) {
             throw new DatoInvalidoException("El campo '" + campo + "' no puede ser negativo.");
         }
-        return valor.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal redondeado = valor.setScale(columna.escala(), RoundingMode.HALF_UP);
+        dentroDeColumna(redondeado, campo, columna);
+        return redondeado;
     }
 
-    static BigDecimal positivo(BigDecimal valor, String campo) {
+    static BigDecimal positivo(BigDecimal valor, String campo, ColumnaDecimal columna) {
         obligatorio(valor, campo);
         if (valor.signum() <= 0) {
             throw new DatoInvalidoException("El campo '" + campo + "' debe ser mayor que cero.");
         }
+        dentroDeColumna(valor.setScale(columna.escala(), RoundingMode.HALF_UP), campo, columna);
         return valor;
+    }
+
+    /** Evita el error 1264 de MySQL: se compara el valor ya redondeado a la escala de la columna. */
+    private static void dentroDeColumna(BigDecimal redondeado, String campo, ColumnaDecimal columna) {
+        if (redondeado.compareTo(columna.maximo()) > 0) {
+            throw new DatoInvalidoException(
+                    "El campo '" + campo + "' no puede superar " + columna.maximo().toPlainString() + ".");
+        }
     }
 
     static int id(int valor, String campo) {

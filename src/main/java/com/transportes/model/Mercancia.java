@@ -83,7 +83,7 @@ public abstract class Mercancia {
 
     /** El bloqueo cuando ya existe un envío asociado (RF-26) lo aplica el controlador. */
     public void setPrecioEnvio(BigDecimal precioEnvio) {
-        this.precioEnvio = Validacion.importe(precioEnvio, "precio de envío");
+        this.precioEnvio = Validacion.importe(precioEnvio, "precio de envío", Validacion.PRECIO);
     }
 
     public boolean isAsegurada() {

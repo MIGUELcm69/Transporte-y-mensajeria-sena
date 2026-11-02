@@ -19,6 +19,6 @@ public class Sobre extends Mercancia {
     }
 
     public void setPeso(BigDecimal peso) {
-        this.peso = Validacion.positivo(peso, "peso");
+        this.peso = Validacion.positivo(peso, "peso", Validacion.PESO);
     }
 }

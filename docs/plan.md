@@ -342,15 +342,15 @@ com.transportes
 
 - [ ] **Etapa 5 · Capa Controller**
   - [x] CRUD por módulo (Vehiculo, Supervisor, Cliente, Mercancia); guards de eliminación (RF-06, RF-11)
-  - [ ] CRUD de Envio (cubierto por las casillas de `EnvioController`)
+  - [x] CRUD de Envio (cubierto por las casillas de `EnvioController`)
   - [x] Guard en `MercanciaController`: rechaza modificar `precio_envio` si `tieneEnvio = true`
   - [x] Transacción atómica supervisor + primer vehículo
-  - [ ] `EnvioController.crear`: obtener el envío con `Envio.nuevo` (calcula `precioTotal`), `sumarTotalFacturado(+delta)`, todo en una transacción
-  - [ ] `EnvioController.modificar`: manejar cambio de `cliente_origen_id` (restar viejo, sumar nuevo) y cambio de `precio_total` (sumar diferencia)
-  - [ ] `EnvioController.eliminar`: `sumarTotalFacturado(-precioTotal)` en la misma transacción
-  - [ ] `EnvioController.registrarIntentoFallido`: obtener el envío con `Envio.conIntentoFallido`, ajustar diferencia en `total_facturado`
+  - [x] `EnvioController.crear`: obtener el envío con `Envio.nuevo` (calcula `precioTotal`), `sumarTotalFacturado(+delta)`, todo en una transacción
+  - [x] `EnvioController.modificar`: manejar cambio de `cliente_origen_id` (restar viejo, sumar nuevo) y cambio de `precio_total` (sumar diferencia)
+  - [x] `EnvioController.eliminar`: `sumarTotalFacturado(-precioTotal)` en la misma transacción
+  - [x] `EnvioController.registrarIntentoFallido`: obtener el envío con `Envio.conIntentoFallido`, ajustar diferencia en `total_facturado`
   - [x] `ClienteController.registrarParticular/registrarEmpresa`: `fecha_alta = LocalDate.now(clock)`, `total_facturado = 0`
-  - [ ] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
+  - [x] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
   - [ ] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
   - [x] Bloquear eliminar o reasignar a otro supervisor el último vehículo de un supervisor (P-01, RF-13)
   - [x] `MercanciaController`: validar los tipos de vehículo (sobre → moto, paquete → furgoneta, avión → AVION) antes de guardar, para dar un mensaje claro (RF-21/RF-24/RF-25)

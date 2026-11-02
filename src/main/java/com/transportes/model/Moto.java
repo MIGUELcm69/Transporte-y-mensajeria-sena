@@ -18,6 +18,6 @@ public class Moto extends Vehiculo {
     }
 
     public void setCilindrada(BigDecimal cilindrada) {
-        this.cilindrada = Validacion.positivo(cilindrada, "cilindrada");
+        this.cilindrada = Validacion.positivo(cilindrada, "cilindrada", Validacion.CILINDRADA);
     }
 }

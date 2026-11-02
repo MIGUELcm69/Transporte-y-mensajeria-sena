@@ -18,6 +18,6 @@ public class Furgoneta extends Vehiculo {
     }
 
     public void setCapacidad(BigDecimal capacidad) {
-        this.capacidad = Validacion.positivo(capacidad, "capacidad");
+        this.capacidad = Validacion.positivo(capacidad, "capacidad", Validacion.CAPACIDAD);
     }
 }
