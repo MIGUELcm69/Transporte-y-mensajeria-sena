@@ -64,6 +64,12 @@ public class EnvioDaoImpl implements EnvioDao {
     }
 
     @Override
+    public Optional<Envio> findById(int id, Connection conexion) {
+        return SoporteJdbc.conConexionExterna(conexion, "buscar envío por id",
+                c -> SoporteJdbc.buscarUno(c, SELECT_POR_ID, s -> s.setInt(1, id), EnvioDaoImpl::mapear));
+    }
+
+    @Override
     public List<Envio> findByCliente(int clienteOrigenId) {
         return SoporteJdbc.conConexionPropia("listar envíos del cliente",
                 c -> SoporteJdbc.buscarVarios(c, SELECT_POR_CLIENTE, s -> s.setInt(1, clienteOrigenId),

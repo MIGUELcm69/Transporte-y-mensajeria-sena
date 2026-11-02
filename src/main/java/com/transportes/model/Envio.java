@@ -55,6 +55,21 @@ public class Envio {
                 precioTotal(precioEnvio, tipoDestinatario, intentos));
     }
 
+    /**
+     * Devuelve una copia con otros datos, el mismo id y los mismos intentos fallidos, y el precio total
+     * recalculado con esos intentos (RF-34). El constructor vuelve a validar ids, clientes distintos y fecha.
+     */
+    public Envio conDatos(int clienteOrigenId, int destinatarioId, int mercanciaId, LocalDate fechaEnvio,
+                          BigDecimal precioEnvio, TipoCliente tipoDestinatario) {
+        if (Validacion.obligatorio(tipoDestinatario, "tipo de destinatario") != TipoCliente.PARTICULAR
+                && intentosFallidos > 0) {
+            throw new DatoInvalidoException("Este envío ya registró " + intentosFallidos
+                    + " intento(s) de entrega fallido(s), así que su destinatario no puede ser una empresa.");
+        }
+        return new Envio(id, clienteOrigenId, destinatarioId, mercanciaId, fechaEnvio, intentosFallidos,
+                precioTotal(precioEnvio, tipoDestinatario, intentosFallidos));
+    }
+
     public BigDecimal calcularPlus(BigDecimal precioEnvio, TipoCliente tipoDestinatario) {
         return plus(precioEnvio, tipoDestinatario, intentosFallidos);
     }

@@ -18,14 +18,16 @@ import java.util.TreeMap;
 /**
  * Guarda y devuelve copias, como la BD: modificar un objeto leído no cambia la fila hasta llamar a update.
  * Como ClienteDaoImpl, update no toca código, tipo, fecha de alta ni total facturado.
+ * {@link #sumasDeTotal} cuenta las llamadas a sumarTotalFacturado.
  */
-final class ClienteDaoEnMemoria implements ClienteDao {
+final class ClienteDaoEnMemoria implements ClienteDao, ConInstantanea {
 
     static final LocalDate FECHA_ALTA = LocalDate.of(2026, 2, 1);
 
     private final Map<Integer, Cliente> filas = new TreeMap<>();
     private final EnvioDaoEnMemoria envios;
     private int siguienteId = 1;
+    int sumasDeTotal;
 
     ClienteDaoEnMemoria(EnvioDaoEnMemoria envios) {
         this.envios = envios;
@@ -43,6 +45,17 @@ final class ClienteDaoEnMemoria implements ClienteDao {
     <C extends Cliente> C sembrar(C cliente) {
         guardar(cliente);
         return cliente;
+    }
+
+    @Override
+    public Runnable instantanea() {
+        Map<Integer, Cliente> copia = new TreeMap<>(filas);
+        int id = siguienteId;
+        return () -> {
+            filas.clear();
+            filas.putAll(copia);
+            siguienteId = id;
+        };
     }
 
     @Override
@@ -101,6 +114,7 @@ final class ClienteDaoEnMemoria implements ClienteDao {
 
     @Override
     public boolean sumarTotalFacturado(int clienteId, BigDecimal delta) {
+        sumasDeTotal++;
         Cliente actual = filas.get(clienteId);
         if (actual == null) {
             return false;

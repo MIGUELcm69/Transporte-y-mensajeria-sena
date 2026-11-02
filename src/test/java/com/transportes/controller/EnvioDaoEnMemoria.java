@@ -14,11 +14,17 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 
-/** Envio es inmutable salvo el id, así que se guardan las mismas instancias. */
-final class EnvioDaoEnMemoria implements EnvioDao {
+/**
+ * Envio es inmutable salvo el id, así que se guardan las mismas instancias.
+ * Las escrituras sin {@link Connection} se cuentan para detectar las hechas fuera de una transacción,
+ * y las lecturas con {@link Connection} para comprobar que el envío actual se lee dentro de ella.
+ */
+final class EnvioDaoEnMemoria implements EnvioDao, ConInstantanea {
 
     private final Map<Integer, Envio> filas = new TreeMap<>();
     private int siguienteId = 1;
+    int escriturasSinTransaccion;
+    int lecturasEnTransaccion;
 
     /** Inserta directamente, como haría seed.sql. */
     Envio sembrar(int clienteOrigenId, int destinatarioId, int mercanciaId, LocalDate fecha, String precioTotal) {
@@ -38,7 +44,19 @@ final class EnvioDaoEnMemoria implements EnvioDao {
     }
 
     @Override
+    public Runnable instantanea() {
+        Map<Integer, Envio> copia = new TreeMap<>(filas);
+        int id = siguienteId;
+        return () -> {
+            filas.clear();
+            filas.putAll(copia);
+            siguienteId = id;
+        };
+    }
+
+    @Override
     public void save(Envio envio) {
+        escriturasSinTransaccion++;
         guardar(envio);
     }
 
@@ -50,29 +68,38 @@ final class EnvioDaoEnMemoria implements EnvioDao {
 
     @Override
     public boolean update(Envio envio) {
-        return filas.replace(envio.getId(), envio) != null;
+        escriturasSinTransaccion++;
+        return actualizar(envio);
     }
 
     @Override
     public boolean update(Envio envio, Connection conexion) {
         Objects.requireNonNull(conexion);
-        return update(envio);
+        return actualizar(envio);
     }
 
     @Override
     public boolean delete(int id) {
+        escriturasSinTransaccion++;
         return filas.remove(id) != null;
     }
 
     @Override
     public boolean delete(int id, Connection conexion) {
         Objects.requireNonNull(conexion);
-        return delete(id);
+        return filas.remove(id) != null;
     }
 
     @Override
     public Optional<Envio> findById(int id) {
         return Optional.ofNullable(filas.get(id));
+    }
+
+    @Override
+    public Optional<Envio> findById(int id, Connection conexion) {
+        Objects.requireNonNull(conexion);
+        lecturasEnTransaccion++;
+        return findById(id);
     }
 
     @Override
@@ -88,13 +115,14 @@ final class EnvioDaoEnMemoria implements EnvioDao {
 
     @Override
     public boolean actualizarIntentos(Envio envio) {
-        return update(envio);
+        escriturasSinTransaccion++;
+        return actualizar(envio);
     }
 
     @Override
     public boolean actualizarIntentos(Envio envio, Connection conexion) {
         Objects.requireNonNull(conexion);
-        return update(envio);
+        return actualizar(envio);
     }
 
     private void guardar(Envio envio) {
@@ -103,5 +131,14 @@ final class EnvioDaoEnMemoria implements EnvioDao {
         }
         envio.asignarId(siguienteId++);
         filas.put(envio.getId(), envio);
+    }
+
+    /** Como uq_envio_mercancia: la mercancía no puede figurar en otro envío. */
+    private boolean actualizar(Envio envio) {
+        if (filas.values().stream()
+                .anyMatch(e -> e.getMercanciaId() == envio.getMercanciaId() && !e.getId().equals(envio.getId()))) {
+            throw new RegistroDuplicadoException("La mercancía ya tiene un envío asociado.");
+        }
+        return filas.replace(envio.getId(), envio) != null;
     }
 }

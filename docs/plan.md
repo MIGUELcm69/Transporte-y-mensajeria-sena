@@ -181,7 +181,8 @@ Las demás restricciones (subtipos, largo_recorrido ↔ avion_id) van en CHECK d
 | Modificar `precio_total` de un envío (mismo cliente): `total_facturado + (nuevo - viejo)` atómico | RF-17 |
 | Modificar `cliente_origen_id` de un envío: restar del cliente anterior y sumar al nuevo en la misma transacción | RF-17 |
 | Registrar intento fallido: obtener el envío recalculado con `Envio.conIntentoFallido`, ajustar `total_facturado` con la diferencia | RF-33 |
-| Invocar el cálculo de plus y `precio_total`, que vive en `Envio` (`calcularPlus`, `calcularPrecioTotal`, `nuevo`, `conIntentoFallido`); el controlador no calcula | RF-31/RF-32 |
+| Invocar el cálculo de plus y `precio_total`, que vive en `Envio` (`nuevo`, `conIntentoFallido`, `conDatos`); el controlador no calcula, solo suma o resta diferencias | RF-31/RF-32 |
+| Modificar un envío conserva sus intentos fallidos (`Envio.conDatos`); si ya tiene intentos, el destinatario no puede pasar a ser una EMPRESA (`DatoInvalidoException`) | RF-30/RF-34 |
 | Poner `fecha_alta = LocalDate.now(clock)` al registrar un cliente (`Clock` inyectable; el de producción es `Clock.systemDefaultZone()`) | P-07 |
 | Validar tipos de vehículo (sobre → moto, paquete → furgoneta, avión) antes de guardar, para dar un mensaje claro | RF-21/RF-24/RF-25 |
 | Contar aviones por supervisor (query derivada) | RF-10 |
@@ -237,7 +238,7 @@ com.transportes
 │   ├── TipoCliente.java             # enum PARTICULAR, EMPRESA
 │   ├── Supervisor.java
 │   ├── Envio.java                   # clienteOrigenId, destinatarioId, mercanciaId, fechaEnvio, intentosFallidos, precioTotal;
-│   │                                #   calcularPlus, calcularPrecioTotal, nuevo, conIntentoFallido
+│   │                                #   calcularPlus, calcularPrecioTotal, nuevo, conIntentoFallido, conDatos
 │   ├── Validacion.java              # interna del paquete: invariantes (textos, longitudes, importes, medidas, ids)
 │   └── dao/
 │       ├── SoporteJdbc.java         # interna: conexión propia/externa, PreparedStatement, try-with-resources
@@ -250,7 +251,7 @@ com.transportes
 │       ├── ClienteDaoImpl.java
 │       ├── MercanciaDao.java        # Interface: save, update, delete, findById, findByCodigo, findByVehiculo, findLargoRecorrido, findAll, tieneEnvio
 │       ├── MercanciaDaoImpl.java
-│       ├── EnvioDao.java            # Interface: save, update, delete, findById, findByCliente, findAll, actualizarIntentos
+│       ├── EnvioDao.java            # Interface: save, update, delete, findById (también con Connection), findByCliente, findAll, actualizarIntentos
 │       └── EnvioDaoImpl.java
 ├── controller/
 │   ├── Transacciones.java           # Interface: ejecutar(TrabajoTransaccional) con commit/rollback
@@ -410,3 +411,4 @@ com.transportes
 5. CHECK de largo_recorrido sobre columnas FK: si MySQL lo rechaza, se mueve a `trg_mercancia_bi/bu` y se indica en el script.
 6. `total_facturado` siempre se actualiza con SQL atómico incremental (`total_facturado + delta`), nunca con read-modify-write.
 7. En los controladores, comprobar una regla y después escribir (p. ej. contar los vehículos del supervisor y luego eliminar o reasignar un vehículo) no es atómico. Se acepta porque es una consola de un solo usuario; la BD sigue protegiendo la integridad con FK, UNIQUE y CHECK. `eliminarTraspasandoVehiculos` no lee la lista de vehículos: los mueve con un único `UPDATE ... WHERE supervisor_id = ?` (`VehiculoDao.reasignarSupervisor`) dentro de la misma transacción que el borrado; solo la comprobación previa de que origen y destino existen queda fuera.
+8. En `EnvioController.modificar`, `eliminar` y `registrarIntentoFallido`, el envío actual se lee dentro de la transacción con `EnvioDao.findById(id, Connection)`, y la diferencia de `total_facturado` se calcula a partir de esa lectura. **No se usa `SELECT ... FOR UPDATE`**: la lectura no bloquea la fila, así que dos operaciones concurrentes sobre el mismo envío podrían calcular el ajuste sobre el mismo valor anterior. Se acepta por el mismo motivo que el supuesto 7 (consola de un solo usuario). Las validaciones de clientes, mercancía y `tieneEnvio` usan su propia conexión.

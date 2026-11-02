@@ -28,6 +28,9 @@ public interface EnvioDao {
 
     Optional<Envio> findById(int id);
 
+    /** Lee el envío con la conexión de la transacción en curso, sin bloquear la fila (sin FOR UPDATE). */
+    Optional<Envio> findById(int id, Connection conexion);
+
     /** Envíos encargados por el cliente origen, por fecha (RF-18, RF-36). */
     List<Envio> findByCliente(int clienteOrigenId);
 
