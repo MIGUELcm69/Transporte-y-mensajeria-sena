@@ -70,7 +70,9 @@ CHECK (
 
 *`telefono` es obligatorio para EMPRESA: lo exigen el CHECK `chk_cliente_subtipo` y el modelo (`ClienteEmpresa`). La columna admite NULL porque PARTICULAR no lo tiene.*
 
-*`fecha_alta` la pone el controlador con `LocalDate.now()` al registrar el cliente; el modelo la exige no nula (P-07).*
+*`fecha_alta` la pone el controlador con `LocalDate.now(clock)` al registrar el cliente; el modelo la exige no nula (P-07).*
+
+*`total_facturado` inicial siempre 0 (interpretación de RF-14/RF-17): RF-14 lo cita como dato del cliente, pero RF-17 dice que se actualiza solo con los envíos, así que no se pide al registrar. Lo garantizan las fábricas `ClienteParticular.nuevo` y `ClienteEmpresa.nuevo`.*
 
 ```sql
 CHECK (
@@ -158,6 +160,8 @@ Seis triggers en `sql/schema.sql`:
 - `avion_id` apunta a tipo='AVION' cuando NOT NULL (RF-25)
 - `vehiculo_destino_id` es MOTO/FURGONETA según tipo cuando NOT NULL (RF-21 + RF-24)
 
+La correspondencia mercancía → vehículo terrestre vive en Java en `TipoMercancia.vehiculoTerrestre()` (SOBRE → MOTO, PAQUETE → FURGONETA), y `MercanciaController` la usa. `sp_validar_mercancia` replica esa misma regla en SQL: **si cambia o se añade un tipo de mercancía, hay que cambiar ambos a la vez**.
+
 Los mensajes de `SIGNAL` están pensados para el usuario final (sin nombres de columna ni términos técnicos); el DAO los pasa tal cual en `ReglaAsignacionException`.
 
 Las demás restricciones (subtipos, largo_recorrido ↔ avion_id) van en CHECK de definición de tabla.
@@ -169,14 +173,16 @@ Las demás restricciones (subtipos, largo_recorrido ↔ avion_id) van en CHECK d
 | Crear supervisor + primer vehículo en una sola transacción | RF-08/RF-13, P-01 |
 | Bloquear eliminación de supervisor con vehículos a cargo | RF-11 |
 | Bloquear eliminación de vehículo con mercancías o envíos asignados | RF-06 |
-| **Bloquear modificación de `precio_envio` si la mercancía ya tiene un envío asociado** (mensaje claro) | RF-26 |
+| **Bloquear modificación de `precio_envio` si la mercancía ya tiene un envío asociado** (mensaje claro); el resto de campos sigue siendo modificable | RF-26 |
+| Bloquear eliminación de cliente que figure en algún envío como origen o destinatario (`ClienteDao.tieneEnvios`) | RF-16 |
+| Rechazar en `ClienteController.modificar` el cambio de tipo (hay que registrar un cliente nuevo) o de código | RF-16 |
 | Crear envío: `UPDATE cliente SET total_facturado = total_facturado + ? WHERE id = cliente_origen_id` | RF-17 |
 | Eliminar envío: `UPDATE cliente SET total_facturado = total_facturado - ? WHERE id = cliente_origen_id` | RF-17 |
 | Modificar `precio_total` de un envío (mismo cliente): `total_facturado + (nuevo - viejo)` atómico | RF-17 |
 | Modificar `cliente_origen_id` de un envío: restar del cliente anterior y sumar al nuevo en la misma transacción | RF-17 |
 | Registrar intento fallido: obtener el envío recalculado con `Envio.conIntentoFallido`, ajustar `total_facturado` con la diferencia | RF-33 |
 | Invocar el cálculo de plus y `precio_total`, que vive en `Envio` (`calcularPlus`, `calcularPrecioTotal`, `nuevo`, `conIntentoFallido`); el controlador no calcula | RF-31/RF-32 |
-| Poner `fecha_alta = LocalDate.now()` al registrar un cliente | P-07 |
+| Poner `fecha_alta = LocalDate.now(clock)` al registrar un cliente (`Clock` inyectable; el de producción es `Clock.systemDefaultZone()`) | P-07 |
 | Validar tipos de vehículo (sobre → moto, paquete → furgoneta, avión) antes de guardar, para dar un mensaje claro | RF-21/RF-24/RF-25 |
 | Contar aviones por supervisor (query derivada) | RF-10 |
 
@@ -224,10 +230,10 @@ com.transportes
 │   ├── Mercancia.java               # Abstract
 │   ├── Sobre.java                   # + peso: BigDecimal
 │   ├── Paquete.java                 # + largo, ancho, alto: BigDecimal
-│   ├── TipoMercancia.java           # enum SOBRE, PAQUETE
+│   ├── TipoMercancia.java           # enum SOBRE, PAQUETE; vehiculoTerrestre() (replicada en sp_validar_mercancia)
 │   ├── Cliente.java                 # Abstract
-│   ├── ClienteParticular.java       # + nif: String
-│   ├── ClienteEmpresa.java          # + cif, telefono: String
+│   ├── ClienteParticular.java       # + nif: String; fábrica nuevo(...) con total facturado 0
+│   ├── ClienteEmpresa.java          # + cif, telefono: String; fábrica nuevo(...) con total facturado 0
 │   ├── TipoCliente.java             # enum PARTICULAR, EMPRESA
 │   ├── Supervisor.java
 │   ├── Envio.java                   # clienteOrigenId, destinatarioId, mercanciaId, fechaEnvio, intentosFallidos, precioTotal;
@@ -240,7 +246,7 @@ com.transportes
 │       ├── VehiculoDaoImpl.java
 │       ├── SupervisorDao.java       # Interface: save, update, delete, findById, findByNif, findAll, contarAviones
 │       ├── SupervisorDaoImpl.java
-│       ├── ClienteDao.java          # Interface: save, update, delete, findById, findByCodigo, findAll, sumarTotalFacturado
+│       ├── ClienteDao.java          # Interface: save, update, delete, findById, findByCodigo, findAll, sumarTotalFacturado, tieneEnvios (origen o destinatario)
 │       ├── ClienteDaoImpl.java
 │       ├── MercanciaDao.java        # Interface: save, update, delete, findById, findByCodigo, findByVehiculo, findLargoRecorrido, findAll, tieneEnvio
 │       ├── MercanciaDaoImpl.java
@@ -253,8 +259,9 @@ com.transportes
 │   ├── FichaSupervisor.java         # record: supervisor + vehículos a cargo + numeroAviones() (RF-10, RF-12)
 │   ├── VehiculoController.java      # guards RF-06 y RF-13 (último vehículo) al eliminar o reasignar
 │   ├── SupervisorController.java    # transacción supervisor + primer vehículo; eliminar / eliminarTraspasandoVehiculos
-│   ├── ClienteController.java
-│   ├── MercanciaController.java     # incluye guard de precio_envio si hay envío
+│   ├── HistorialCliente.java        # record: cliente + envíos encargados + totalFacturado() (RF-18, RF-36)
+│   ├── ClienteController.java       # registrarParticular/registrarEmpresa con Clock; guard de eliminación con envíos
+│   ├── MercanciaController.java     # guard de precio_envio si hay envío; tipos de vehículo vía TipoMercancia
 │   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
 ├── view/
 │   ├── MenuPrincipal.java
@@ -340,14 +347,14 @@ com.transportes
   - [ ] `EnvioController.modificar`: manejar cambio de `cliente_origen_id` (restar viejo, sumar nuevo) y cambio de `precio_total` (sumar diferencia)
   - [ ] `EnvioController.eliminar`: `sumarTotalFacturado(-precioTotal)` en la misma transacción
   - [ ] `EnvioController.registrarIntentoFallido`: obtener el envío con `Envio.conIntentoFallido`, ajustar diferencia en `total_facturado`
-  - [ ] `ClienteController.registrar`: `fecha_alta = LocalDate.now()`
+  - [ ] `ClienteController.registrarParticular/registrarEmpresa`: `fecha_alta = LocalDate.now(clock)`, `total_facturado = 0`
   - [ ] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
   - [ ] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
   - [ ] Bloquear eliminar o reasignar a otro supervisor el último vehículo de un supervisor (P-01, RF-13)
   - [ ] `MercanciaController`: validar los tipos de vehículo (sobre → moto, paquete → furgoneta, avión → AVION) antes de guardar, para dar un mensaje claro (RF-21/RF-24/RF-25)
   - [ ] `SupervisorController`: exponer el conteo de aviones por supervisor (RF-10)
   - [ ] `SupervisorController.eliminarTraspasandoVehiculos(id, supervisorDestinoId)`: destino existente y distinto; mover vehículos y borrar en una transacción. `eliminar(id)` solo para supervisores sin vehículos (RF-11, RF-13)
-  - [ ] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`
+  - [ ] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`; incluir el SQL de `ClienteDaoImpl.tieneEnvios` (cliente como origen y como destinatario)
   - [ ] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
     - Reglas de los controladores: con DAO falsos en memoria que implementan las interfaces `*Dao`
     - Transacciones: contra un esquema aparte `transportes_test`, nunca contra `transportes_db`
@@ -387,7 +394,7 @@ com.transportes
 | P-04 | RF-29 = FK obligatoria `cliente_origen_id NOT NULL`. Sin precondición adicional de creación. |
 | P-05 | `envio.destinatario_id FK → cliente(id)`. El destinatario debe estar registrado como cliente. |
 | P-06 | UNIQUE sobre `envio.mercancia_id` (relación 1:1). |
-| P-07 | `fecha_alta DATE NOT NULL`. La pone el controlador con `LocalDate.now()` al registrar; el modelo no aplica valor por defecto. |
+| P-07 | `fecha_alta DATE NOT NULL`. La pone el controlador con `LocalDate.now(clock)` al registrar; el modelo no aplica valor por defecto. |
 | P-08 | `asegurada` solo informativa; sin impacto en cálculos; se muestra en listados. |
 | P-09 | RF-23/RF-24 (largo recorrido exige avión y vehículo de destino) → CHECK en tabla + modelo (`Mercancia.asignarVehiculos`). Tipos de vehículo RF-21/RF-24/RF-25 (sobre → moto, paquete → furgoneta, avión → AVION) → triggers en `mercancia` + controlador para mensajes claros. |
 

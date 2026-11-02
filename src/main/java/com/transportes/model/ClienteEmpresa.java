@@ -15,6 +15,12 @@ public class ClienteEmpresa extends Cliente {
         setTelefono(telefono);
     }
 
+    /** Cliente aún no guardado: sin id y con total facturado 0 (RF-14, RF-17). */
+    public static ClienteEmpresa nuevo(String codigoCliente, LocalDate fechaAlta, String cif, String nombre,
+                                       String direccion, String telefono) {
+        return new ClienteEmpresa(null, codigoCliente, fechaAlta, BigDecimal.ZERO, cif, nombre, direccion, telefono);
+    }
+
     public String getCif() {
         return cif;
     }

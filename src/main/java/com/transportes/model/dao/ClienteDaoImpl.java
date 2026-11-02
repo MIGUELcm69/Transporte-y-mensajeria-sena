@@ -31,6 +31,8 @@ public class ClienteDaoImpl implements ClienteDao {
     private static final String DELETE = "DELETE FROM cliente WHERE id = ?";
     private static final String SUMAR_TOTAL_FACTURADO =
             "UPDATE cliente SET total_facturado = total_facturado + ? WHERE id = ?";
+    private static final String TIENE_ENVIOS =
+            "SELECT EXISTS (SELECT 1 FROM envio WHERE cliente_origen_id = ? OR destinatario_id = ?)";
 
     @Override
     public void save(Cliente cliente) {
@@ -91,6 +93,15 @@ public class ClienteDaoImpl implements ClienteDao {
     public boolean sumarTotalFacturado(int clienteId, BigDecimal delta, Connection conexion) {
         return SoporteJdbc.conConexionExterna(conexion, "actualizar total facturado",
                 c -> sumar(clienteId, delta, c));
+    }
+
+    @Override
+    public boolean tieneEnvios(int clienteId) {
+        return SoporteJdbc.conConexionPropia("comprobar envíos del cliente",
+                c -> SoporteJdbc.consultarEntero(c, TIENE_ENVIOS, s -> {
+                    s.setInt(1, clienteId);
+                    s.setInt(2, clienteId);
+                }) == 1);
     }
 
     private static Void insertar(Cliente cliente, Connection conexion) throws SQLException {

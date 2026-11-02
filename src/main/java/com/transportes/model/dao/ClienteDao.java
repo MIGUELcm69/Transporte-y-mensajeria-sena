@@ -43,4 +43,7 @@ public interface ClienteDao {
     boolean sumarTotalFacturado(int clienteId, BigDecimal delta);
 
     boolean sumarTotalFacturado(int clienteId, BigDecimal delta, Connection conexion);
+
+    /** Si el cliente figura en algún envío como cliente origen o como destinatario (RF-16). */
+    boolean tieneEnvios(int clienteId);
 }

@@ -13,6 +13,12 @@ public class ClienteParticular extends Cliente {
         setNif(nif);
     }
 
+    /** Cliente aún no guardado: sin id y con total facturado 0 (RF-14, RF-17). */
+    public static ClienteParticular nuevo(String codigoCliente, LocalDate fechaAlta, String nif, String nombre,
+                                          String direccion) {
+        return new ClienteParticular(null, codigoCliente, fechaAlta, BigDecimal.ZERO, nif, nombre, direccion);
+    }
+
     public String getNif() {
         return nif;
     }

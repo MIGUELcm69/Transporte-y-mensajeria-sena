@@ -37,6 +37,11 @@ final class VehiculoDaoEnMemoria implements VehiculoDao, ConInstantanea {
         return new Moto(null, codigo, "Moto " + codigo, FECHA, PRECIO, supervisorId, new BigDecimal("125.00"));
     }
 
+    static Vehiculo furgoneta(String codigo, int supervisorId) {
+        return new Furgoneta(null, codigo, "Furgoneta " + codigo, FECHA, PRECIO, supervisorId,
+                new BigDecimal("12.50"));
+    }
+
     static Vehiculo avion(String codigo, int supervisorId) {
         return new Avion(null, codigo, "Avión " + codigo, FECHA, PRECIO, supervisorId);
     }
