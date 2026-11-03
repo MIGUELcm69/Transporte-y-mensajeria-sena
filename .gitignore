@@ -14,3 +14,5 @@ sql/*.local.sql
 # Sistema operativo
 .DS_Store
 Thumbs.db
+
+logs/

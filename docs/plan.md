@@ -219,9 +219,10 @@ Columnas `DECIMAL(x,2)` en BD: la escala Java siempre coincide con la BD.
 
 ```
 com.transportes
-├── Main.java
+├── Main.java                        # raíz de composición: configura el log, crea DAO, TransaccionesJdbc, controladores y vistas; arranca MenuPrincipal
 ├── config/
-│   └── ConexionBD.java              # Utilidad estática, no Singleton: carga la configuración (entorno o config.properties) al llamar a getConnection()
+│   ├── ConexionBD.java              # Utilidad estática, no Singleton: carga la configuración (entorno o config.properties) al llamar a getConnection()
+│   └── RegistroLog.java             # configurar(): FileHandler único en logs/transportes.log, sin rotación ni ConsoleHandler; FormatoLinea
 ├── model/
 │   ├── Vehiculo.java                # Abstract
 │   ├── Moto.java                    # + cilindrada: BigDecimal
@@ -265,13 +266,21 @@ com.transportes
 │   ├── MercanciaController.java     # guard de precio_envio si hay envío; tipos de vehículo vía TipoMercancia
 │   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
 ├── view/
+│   ├── Consola.java                 # Consola(Scanner, PrintStream): elegirOpcion, leerEntero, leerDecimal(Rango), leerFecha, leerFechaOHoy,
+│   │                                #   leerTextoNoVacio, confirmar y variantes …OActual (Enter conserva); "cancelar" en un campo
+│   ├── OperacionCancelada.java      # unchecked, no hereda de DomainException; solo cuando el usuario escribe "cancelar"
+│   ├── FinDeEntrada.java            # unchecked: entrada agotada → el menú principal termina
+│   ├── ManejadorErrores.java        # único punto excepción → mensaje; log sin datos personales
+│   ├── Formato.java                 # fechas dd/MM/aaaa, importes con 2 decimales, sí/no
+│   ├── VistaModulo.java             # abstracta: bucle de submenú con Opcion(texto, accion) dentro de ManejadorErrores
 │   ├── MenuPrincipal.java
-│   ├── Consola.java                 # leerInt, leerDecimal, leerFecha, leerTextoNoVacio
+│   ├── FormularioVehiculo.java      # interna: tipo, datos comunes y propios, resumen; compartida por VehiculoView y SupervisorView
 │   ├── VehiculoView.java
 │   ├── SupervisorView.java
 │   ├── ClienteView.java
 │   ├── MercanciaView.java
-│   └── EnvioView.java
+│   ├── EnvioView.java
+│   └── ReportesView.java            # RF-35, RF-36, RF-37
 └── exception/
     ├── DomainException.java         # Base unchecked
     ├── DatoInvalidoException.java   # invariantes del modelo, CHECK (3819), fuera de rango (1264)
@@ -298,6 +307,12 @@ com.transportes
 | 1452 FK inexistente | `DatoInvalidoException` |
 | 1264 fuera de rango | `DatoInvalidoException` |
 | 1205, 1213 y resto | `AccesoDatosException` (mensaje genérico) |
+
+**Regla del log: nunca escribe datos personales** (NIF, CIF, nombres, direcciones, teléfonos).
+- Solo se registran el tipo de excepción y un mensaje sin datos del usuario; nunca la excepción adjunta ni su traza.
+- `RegistroLog.FormatoLinea` lo garantiza para cualquier llamada: de la excepción adjunta solo escribe su tipo, porque el mensaje de MySQL (p. ej. `Duplicate entry '<NIF>'`) puede contener datos.
+- `ManejadorErrores` no registra las `DomainException`: su mensaje puede incluir el identificador buscado (p. ej. un NIF). Registra tipo y mensaje de `ConfiguracionException`, `AccesoDatosException` y de las excepciones inesperadas.
+- Al crear un mensaje de log nuevo, no concatenar valores introducidos por el usuario.
 
 ---
 
@@ -351,25 +366,64 @@ com.transportes
   - [x] `EnvioController.registrarIntentoFallido`: obtener el envío con `Envio.conIntentoFallido`, ajustar diferencia en `total_facturado`
   - [x] `ClienteController.registrarParticular/registrarEmpresa`: `fecha_alta = LocalDate.now(clock)`, `total_facturado = 0`
   - [x] Todos los `BigDecimal` con `setScale(2, RoundingMode.HALF_UP)`
-  - [ ] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
+  - [x] Limitar dígitos de decimales en `Validacion` según `schema.sql` (error MySQL 1264)
   - [x] Bloquear eliminar o reasignar a otro supervisor el último vehículo de un supervisor (P-01, RF-13)
   - [x] `MercanciaController`: validar los tipos de vehículo (sobre → moto, paquete → furgoneta, avión → AVION) antes de guardar, para dar un mensaje claro (RF-21/RF-24/RF-25)
   - [x] `SupervisorController`: exponer el conteo de aviones por supervisor (RF-10)
   - [x] `SupervisorController.eliminarTraspasandoVehiculos(id, supervisorDestinoId)`: destino existente y distinto; mover vehículos y borrar en una transacción. `eliminar(id)` solo para supervisores sin vehículos (RF-11, RF-13)
-  - [ ] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`; incluir el SQL de `ClienteDaoImpl.tieneEnvios` (cliente como origen y como destinatario)
-  - [ ] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
+  - [x] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`
+  - [ ] Test de integración del SQL de `ClienteDaoImpl.tieneEnvios` (cliente como origen y como destinatario)
+  - [x] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
     - Reglas de los controladores: con DAO falsos en memoria que implementan las interfaces `*Dao`
     - Transacciones: contra un esquema aparte `transportes_test`, nunca contra `transportes_db`
 
 - [ ] **Etapa 6 · Capa View**
-  - [ ] `Consola.java`: validación de tipos, fechas, rangos; nunca se propaga excepción al menú
-  - [ ] Menú principal + submenús por módulo (RF-38/RF-39)
-  - [ ] Mensajes de éxito/error sin stack traces; detalle a log
-  - [ ] Configurar `java.util.logging` para escribir en archivo y no en consola (por defecto, `ConsoleHandler` imprime WARNING/SEVERE con stack trace en stderr)
-  - [ ] Capturar por separado `ConfiguracionException` y `AccesoDatosException` (no heredan de `DomainException`)
-  - [ ] Crear objetos nuevos en cada intento tras un rollback: la entidad conserva el id asignado por `save` aunque la transacción se revierta (`asignarId` solo admite una asignación)
-  - [ ] `catch` final genérico para excepciones no de dominio (`IllegalArgumentException`, `IllegalStateException`, etc.): mensaje amable al usuario y detalle al log
-  - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya
+  - Decisiones: `OperacionCancelada` unchecked y fuera de `DomainException`; tras un error de dominio en un formulario se vuelve al menú del módulo; fechas `dd/MM/aaaa` (solo en *registrar envío* Enter = hoy, y se muestra); en *modificar*, Enter conserva el valor actual.
+  - [x] **Parte 1 · Consola, log y Main**
+    - [x] `Consola.java`: validación de tipos, fechas, rangos; nunca se propaga excepción al menú
+    - [x] Configurar `java.util.logging` para escribir en archivo y no en consola (por defecto, `ConsoleHandler` imprime WARNING/SEVERE con stack trace en stderr): `logs/transportes.log`, sin rotación; aviso visible una vez si no se puede abrir
+    - [x] `ManejadorErrores`: capturar por separado `ConfiguracionException` y `AccesoDatosException` (no heredan de `DomainException`); mensajes sin stack traces; regla del log sin datos personales
+    - [x] `catch` final genérico para excepciones no de dominio (`IllegalArgumentException`, `IllegalStateException`, etc.): mensaje amable al usuario y tipo y mensaje al log
+    - [x] Menú principal con los seis módulos (aún sin opciones) y `Main` como raíz de composición (RF-38)
+    - [x] Tests: `ConsolaTest`, `ManejadorErroresTest`, `MenuPrincipalTest`, `RegistroLogTest`
+    - [x] Comprobaciones manuales:
+      1. Ejecutar `Main` desde IntelliJ: aparecen el título, la ayuda de "cancelar" y el menú principal con Vehículos, Supervisores, Clientes, Mercancías, Envíos y Reportes.
+      2. En el menú escribir `abc`, `9` y Enter vacío: cada vez sale `[ERROR] Opción no válida…` y vuelve a preguntar.
+      3. Entrar en cada módulo: solo muestra `0. Volver`; `0` vuelve al menú principal.
+      4. `0` en el menú principal: muestra "Hasta pronto." y el proceso termina.
+      5. Comprobar que existe `logs/transportes.log` en la carpeta de trabajo, que tras una sesión contiene una línea `INFO com.transportes.Main - Aplicación iniciada` y otra `… Aplicación finalizada`, y que `git status` no lo muestra.
+      6. Marcar `logs/transportes.log` como solo lectura (Propiedades → Solo lectura) y arrancar: aparece una vez `[ERROR] No se pudo abrir el archivo de log…` y el menú funciona. Después quitar el solo lectura.
+      7. Pulsar Ctrl+D en la consola de IntelliJ, en un menú: la aplicación termina con "Hasta pronto." sin stack trace.
+  - [ ] **Parte 2 · Vehículo y Supervisor**
+    - [ ] `VehiculoView`: registrar para un supervisor existente (por NIF), modificar (código y tipo fijos; Enter conserva; cambio de supervisor por NIF), eliminar con confirmación, listar todos, listar por tipo, consultar por código (RF-01 a RF-08)
+    - [ ] `SupervisorView`: registrar con su primer vehículo, modificar (NIF incluido), eliminar sin vehículos, eliminar traspasando sus vehículos, listar con vehículos y nº de aviones, consultar por NIF (RF-09 a RF-13)
+    - [ ] `FormularioVehiculo` (interno de `view`): tipo, datos comunes y propios, resumen en una línea; `switch` sobre `TipoVehiculo` sin `default`
+    - [ ] Crear objetos nuevos en cada intento tras un rollback: la entidad conserva el id asignado por `save` aunque la transacción se revierta (`asignarId` solo admite una asignación). Cada acción construye sus objetos al ejecutarse; `pedirNuevo` devuelve una `IntFunction` que crea un vehículo nuevo en cada llamada
+    - [ ] Tests: `FormularioVehiculoTest`
+    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+      1. Supervisores → Listar: cada supervisor sale con sus vehículos y su número de aviones.
+      2. Supervisores → Registrar con primer vehículo (MOTO, cilindrada 125): éxito y ficha con 1 vehículo y 0 aviones. Repetir con un AVION: la ficha dice 1 avión.
+      3. Repetir el registro con un NIF nuevo pero un código de vehículo ya existente: `[ERROR] Ya existe un vehículo con ese código.` y en Listar no aparece el supervisor nuevo (rollback).
+      4. Repetir otra vez el paso 3 con un código libre: se registra bien (objetos nuevos tras el rollback).
+      5. Registrar con un NIF ya existente: `[ERROR] Ya existe un supervisor con ese NIF.`; vuelve al menú de Supervisores.
+      6. En cualquier campo del formulario escribir `cancelar`: "Operación cancelada." y vuelve al menú del módulo; en el tipo de vehículo, `0` también cancela.
+      7. Entradas inválidas: fecha `31/02/2025`, precio `-5`, cilindrada `0`, precio `abc`: cada una vuelve a preguntar sin salir del formulario.
+      8. Vehículos → Registrar para un supervisor existente (por NIF) y para un NIF inexistente: éxito / `[ERROR] No existe un supervisor…`.
+      9. Vehículos → Modificar: Enter en todos los campos deja los datos igual; cambiar la descripción y el precio y comprobarlo en Consultar por código.
+      10. Vehículos → Modificar el único vehículo de un supervisor poniéndole otro NIF: `[ERROR] No se puede reasignar el vehículo: es el único a cargo de su supervisor.`
+      11. Vehículos → Eliminar: un vehículo con mercancías (de `seed.sql`) → error de mercancías asignadas; el único de un supervisor → error de último vehículo; uno libre de un supervisor con varios → confirmar `n` no borra, confirmar `s` lo borra.
+      12. Vehículos → Listar todos y Listar por tipo (MOTO, FURGONETA, AVION): cada línea muestra el NIF de su supervisor y el dato propio del tipo.
+      13. Supervisores → Eliminar sin vehículos a uno que tiene vehículos: `[ERROR] … tiene vehículos a cargo; traspáselos antes a otro supervisor.`
+      14. Supervisores → Eliminar traspasando: mismo NIF de origen y destino → error; NIF distintos → muestra cuántos se traspasan, confirmar `s`, y en Listar el destino tiene los vehículos y el origen ya no existe.
+      15. Supervisores → Modificar: cambiar el teléfono; cambiar el NIF a uno de otro supervisor → `[ERROR] Ya existe un supervisor con ese NIF.`
+      16. Con MySQL detenido, cualquier opción que consulte: `[ERROR] No se pudo completar la operación en la base de datos. Compruebe que el servidor MySQL esté activo e inténtelo de nuevo.` y la aplicación sigue.
+      17. Revisar `logs/transportes.log`: no aparece ningún NIF, nombre, dirección ni teléfono de las pruebas anteriores.
+  - [ ] **Parte 3 · Cliente y Mercancía**
+    - [ ] `MercanciaController.listarPorVehiculo` y `listarLargoRecorrido` (RF-35, RF-37) con sus tests
+  - [ ] **Parte 4 · Envío y Reportes**
+    - [ ] `ReportesView` con RF-35, RF-36 y RF-37 conectados
+    - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya
+  - [ ] Mensajes de éxito/error sin stack traces en todos los módulos (RF-39)
   - [ ] Verificación: prueba manual de flujo completo
 
 - [ ] **Etapa 7 · Reportes**

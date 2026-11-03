@@ -20,8 +20,9 @@ import java.util.regex.Pattern;
 
 /**
  * Convierte una SQLException en una excepción con mensaje apto para el usuario.
- * El mensaje original de MySQL solo va al log; al usuario llega el texto de un trigger (1644),
- * que está redactado para él en sql/schema.sql, o un mensaje propio.
+ * Al usuario llega el texto de un trigger (1644), que está redactado para él en sql/schema.sql, o un mensaje
+ * propio. Al log van la operación, el código y el SQLState; el formato del log (RegistroLog) descarta el
+ * mensaje original de MySQL, que puede contener datos personales.
  */
 final class TraductorErroresSql {
 
