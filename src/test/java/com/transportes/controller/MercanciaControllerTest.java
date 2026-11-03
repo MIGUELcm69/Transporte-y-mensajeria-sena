@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
 
 import static com.transportes.controller.MercanciaDaoEnMemoria.PRECIO_ENVIO;
 import static com.transportes.controller.MercanciaDaoEnMemoria.paquete;
@@ -151,5 +153,60 @@ class MercanciaControllerTest {
         controller.eliminar(mercancia.getId());
 
         assertTrue(mercancias.findById(mercancia.getId()).isEmpty());
+    }
+
+    @Test
+    void bloqueoPrecioEnvioSoloConEnvioYConElMismoMensajeQueModificar() {
+        Sobre libre = mercancias.sembrar(sobre("S-1", motoId));
+        Sobre conEnvio = mercancias.sembrar(sobre("S-2", motoId));
+        asociarEnvio(conEnvio);
+        conEnvio.setPrecioEnvio(new BigDecimal("99.00"));
+
+        assertTrue(controller.bloqueoPrecioEnvio(libre.getId()).isEmpty());
+        MercanciaConEnvioException rechazo =
+                assertThrows(MercanciaConEnvioException.class, () -> controller.modificar(conEnvio));
+        assertEquals(Optional.of(rechazo.getMessage()), controller.bloqueoPrecioEnvio(conEnvio.getId()));
+    }
+
+    @Test
+    void bloqueoPrecioEnvioExigeMercanciaExistente() {
+        assertThrows(EntidadNoEncontradaException.class, () -> controller.bloqueoPrecioEnvio(99));
+    }
+
+    @Test
+    void listarPorVehiculoIncluyeLasMercanciasDondeFiguraEnCualquierTramo() {
+        int otraMotoId = vehiculos.sembrar(moto("M-2", SUPERVISOR)).getId();
+        mercancias.sembrar(sobre("S-1", motoId));
+        mercancias.sembrar(sobreLargoRecorrido("S-2", otraMotoId, avionId, motoId));
+        mercancias.sembrar(paquete("P-1", furgonetaId));
+
+        assertEquals(List.of("S-1", "S-2"), codigos(controller.listarPorVehiculo(motoId)));
+        assertEquals(List.of("S-2"), codigos(controller.listarPorVehiculo(avionId)));
+        assertEquals(List.of("P-1"), codigos(controller.listarPorVehiculo(furgonetaId)));
+    }
+
+    @Test
+    void listarPorVehiculoDevuelveVaciaSiNoTieneMercancias() {
+        assertTrue(controller.listarPorVehiculo(avionId).isEmpty());
+    }
+
+    @Test
+    void listarPorVehiculoExigeVehiculoExistente() {
+        assertThrows(EntidadNoEncontradaException.class, () -> controller.listarPorVehiculo(99));
+    }
+
+    @Test
+    void listarLargoRecorridoSoloDevuelveLasDeLargoRecorrido() {
+        mercancias.sembrar(sobre("S-1", motoId));
+        mercancias.sembrar(sobreLargoRecorrido("S-2", motoId, avionId, motoId));
+
+        List<Mercancia> largoRecorrido = controller.listarLargoRecorrido();
+
+        assertEquals(List.of("S-2"), codigos(largoRecorrido));
+        assertEquals(avionId, largoRecorrido.get(0).getAvionId());
+    }
+
+    private static List<String> codigos(List<Mercancia> lista) {
+        return lista.stream().map(Mercancia::getCodigo).toList();
     }
 }

@@ -263,7 +263,7 @@ com.transportes
 │   ├── SupervisorController.java    # transacción supervisor + primer vehículo; eliminar / eliminarTraspasandoVehiculos
 │   ├── HistorialCliente.java        # record: cliente + envíos encargados + totalFacturado() (RF-18, RF-36)
 │   ├── ClienteController.java       # registrarParticular/registrarEmpresa con Clock; guard de eliminación con envíos
-│   ├── MercanciaController.java     # guard de precio_envio si hay envío; tipos de vehículo vía TipoMercancia
+│   ├── MercanciaController.java     # guard de precio_envio si hay envío (y bloqueoPrecioEnvio para la vista); tipos de vehículo vía TipoMercancia; RF-35, RF-37
 │   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
 ├── view/
 │   ├── Consola.java                 # Consola(Scanner, PrintStream): elegirOpcion, leerEntero, leerDecimal(Rango), leerFecha, leerFechaOHoy,
@@ -275,6 +275,7 @@ com.transportes
 │   ├── VistaModulo.java             # abstracta: bucle de submenú con Opcion(texto, accion) dentro de ManejadorErrores
 │   ├── MenuPrincipal.java
 │   ├── FormularioVehiculo.java      # interna: tipo, datos comunes y propios, resumen; compartida por VehiculoView y SupervisorView
+│   ├── FormularioMercancia.java     # interna: tipo, datos comunes, medidas, vehículos vía SelectorVehiculo, resumen y tramos
 │   ├── VehiculoView.java
 │   ├── SupervisorView.java
 │   ├── ClienteView.java
@@ -394,13 +395,13 @@ com.transportes
       5. Comprobar que existe `logs/transportes.log` en la carpeta de trabajo, que tras una sesión contiene una línea `INFO com.transportes.Main - Aplicación iniciada` y otra `… Aplicación finalizada`, y que `git status` no lo muestra.
       6. Marcar `logs/transportes.log` como solo lectura (Propiedades → Solo lectura) y arrancar: aparece una vez `[ERROR] No se pudo abrir el archivo de log…` y el menú funciona. Después quitar el solo lectura.
       7. Pulsar Ctrl+D en la consola de IntelliJ, en un menú: la aplicación termina con "Hasta pronto." sin stack trace.
-  - [ ] **Parte 2 · Vehículo y Supervisor**
-    - [ ] `VehiculoView`: registrar para un supervisor existente (por NIF), modificar (código y tipo fijos; Enter conserva; cambio de supervisor por NIF), eliminar con confirmación, listar todos, listar por tipo, consultar por código (RF-01 a RF-08)
-    - [ ] `SupervisorView`: registrar con su primer vehículo, modificar (NIF incluido), eliminar sin vehículos, eliminar traspasando sus vehículos, listar con vehículos y nº de aviones, consultar por NIF (RF-09 a RF-13)
-    - [ ] `FormularioVehiculo` (interno de `view`): tipo, datos comunes y propios, resumen en una línea; `switch` sobre `TipoVehiculo` sin `default`
-    - [ ] Crear objetos nuevos en cada intento tras un rollback: la entidad conserva el id asignado por `save` aunque la transacción se revierta (`asignarId` solo admite una asignación). Cada acción construye sus objetos al ejecutarse; `pedirNuevo` devuelve una `IntFunction` que crea un vehículo nuevo en cada llamada
-    - [ ] Tests: `FormularioVehiculoTest`
-    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+  - [x] **Parte 2 · Vehículo y Supervisor**
+    - [x] `VehiculoView`: registrar para un supervisor existente (por NIF), modificar (código y tipo fijos; Enter conserva; cambio de supervisor por NIF), eliminar con confirmación, listar todos, listar por tipo, consultar por código (RF-01 a RF-08)
+    - [x] `SupervisorView`: registrar con su primer vehículo, modificar (NIF incluido), eliminar sin vehículos, eliminar traspasando sus vehículos, listar con vehículos y nº de aviones, consultar por NIF (RF-09 a RF-13)
+    - [x] `FormularioVehiculo` (interno de `view`): tipo, datos comunes y propios, resumen en una línea; `switch` sobre `TipoVehiculo` sin `default`
+    - [x] Crear objetos nuevos en cada intento tras un rollback: la entidad conserva el id asignado por `save` aunque la transacción se revierta (`asignarId` solo admite una asignación). Cada acción construye sus objetos al ejecutarse; `pedirNuevo` devuelve una `IntFunction` que crea un vehículo nuevo en cada llamada
+    - [x] Tests: `FormularioVehiculoTest`
+    - [x] Comprobaciones manuales (con los datos de `seed.sql` cargados):
       1. Supervisores → Listar: cada supervisor sale con sus vehículos y su número de aviones.
       2. Supervisores → Registrar con primer vehículo (MOTO, cilindrada 125): éxito y ficha con 1 vehículo y 0 aviones. Repetir con un AVION: la ficha dice 1 avión.
       3. Repetir el registro con un NIF nuevo pero un código de vehículo ya existente: `[ERROR] Ya existe un vehículo con ese código.` y en Listar no aparece el supervisor nuevo (rollback).
@@ -420,8 +421,35 @@ com.transportes
       17. Revisar `logs/transportes.log`: no aparece ningún NIF, nombre, dirección ni teléfono de las pruebas anteriores.
   - [ ] **Parte 3 · Cliente y Mercancía**
     - [ ] `MercanciaController.listarPorVehiculo` y `listarLargoRecorrido` (RF-35, RF-37) con sus tests
+    - [ ] `MercanciaController.bloqueoPrecioEnvio(id)`: devuelve el mismo mensaje con el que `modificar` rechaza el cambio de precio (RF-26), para que la vista no pregunte el precio y muestre ese mensaje
+    - [ ] `ClienteView`: registrar particular y empresa (sin fecha de alta ni total facturado: los pone el controlador), modificar (código y tipo no se piden; Enter conserva), eliminar con confirmación, listar, consultar por código, historial de envíos con su total (RF-14 a RF-18). Recibe `MercanciaController` para mostrar el código de la mercancía de cada envío
+    - [ ] `MercanciaView`: registrar, modificar (código y tipo fijos; Enter conserva, también los vehículos; precio bloqueado si tiene envío), eliminar con confirmación, listar, consultar por código (RF-19 a RF-26). Antes de pedir cada vehículo lista los del tipo adecuado (`TipoMercancia.vehiculoTerrestre()` o AVION); si no hay ninguno, cancela la operación. El tipo lo vuelve a comprobar el controlador
+    - [ ] `FormularioMercancia` (interno de `view`): tipo, datos comunes, medidas propias, vehículos mediante un `SelectorVehiculo`, resumen y tramos en una línea; `switch` sobre `TipoMercancia` sin `default`
+    - [ ] `ReportesView`: RF-35 (cada vehículo con sus mercancías, también como avión o vehículo de destino) y RF-37 (largo recorrido con su avión)
+    - [ ] Tests: `FormularioMercanciaTest`; casos nuevos en `MercanciaControllerTest`
+    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+      1. Clientes → Registrar particular: no pide fecha ni total facturado; el mensaje de éxito muestra la fecha de alta de hoy y en Consultar por código sale `total facturado 0.00`.
+      2. Clientes → Registrar empresa: pide CIF, nombre, dirección y teléfono; mismo resultado que el paso 1.
+      3. Registrar un cliente con un código, NIF o CIF ya existente: `[ERROR] Ya existe…` y vuelve al menú de Clientes; repetirlo con datos libres funciona (objetos nuevos en cada intento).
+      4. Clientes → Modificar: no pide código ni tipo; Enter en todo deja los datos igual; cambiar la dirección y comprobarlo en Consultar. En una empresa pide también el teléfono.
+      5. Clientes → Modificar poniendo el NIF de otro cliente: `[ERROR] Ya existe…`.
+      6. Clientes → Eliminar un cliente de `seed.sql` con envíos (como origen y, en otro, como destinatario): `[ERROR] No se puede eliminar el cliente porque figura en envíos…`. Uno recién creado: `n` no lo borra, `s` lo borra.
+      7. Clientes → Historial: un cliente con envíos muestra fecha, destinatario, mercancía, intentos y total de cada uno, y el total facturado; uno sin envíos dice "No ha encargado ningún envío." y total 0.00. Código inexistente: `[ERROR] No existe un cliente…`.
+      8. Mercancías → Registrar SOBRE sin largo recorrido: pide peso; antes del código del vehículo lista solo motos. Elegir una moto: éxito.
+      9. Mercancías → Registrar PAQUETE de largo recorrido: pide largo, ancho y alto; lista furgonetas, luego aviones, luego furgonetas otra vez. Éxito, y en Consultar salen los tres códigos.
+      10. Registrar un SOBRE escribiendo el código de una furgoneta (o un AVION como vehículo de destino): `[ERROR] Una mercancía de tipo SOBRE debe asignarse a un vehículo de tipo MOTO.` (o el mensaje del destino) y vuelve al menú de Mercancías.
+      11. Código de vehículo inexistente: `[ERROR] No existe un vehículo…`. Código de mercancía repetido: `[ERROR] Ya existe…`.
+      12. Entradas inválidas: precio `-1`, peso `0`, medida `abc`, asegurada `x`: cada una vuelve a preguntar sin salir del formulario. `cancelar` en cualquier campo y `0` en el tipo: "Operación cancelada.".
+      13. Mercancías → Modificar una mercancía con envío (de `seed.sql`): muestra "No se puede modificar el precio de envío porque la mercancía ya tiene un envío asociado. Se conserva …" y no pregunta el precio; cambiar la descripción funciona.
+      14. Mercancías → Modificar una sin envío: Enter en todo conserva datos y vehículos; cambiar el precio funciona. Pasarla a largo recorrido pide avión y vehículo de destino; quitarle el largo recorrido deja de mostrarlos en Consultar.
+      15. Mercancías → Eliminar: con envío → `[ERROR] No se puede eliminar la mercancía porque tiene un envío asociado.`; sin envío → `n` no borra, `s` borra.
+      16. Mercancías → Listar: cada línea muestra tipo, precio, asegurada, largo recorrido, la medida propia y los códigos de sus vehículos.
+      17. Reportes → Mercancías asignadas a cada vehículo: cada vehículo con sus mercancías; un avión muestra las de largo recorrido que lleva; uno sin mercancías dice "(sin mercancías)".
+      18. Reportes → Mercancías de largo recorrido: solo salen las de largo recorrido, cada una con la línea `Avión:` y sus tres vehículos.
+      19. Con MySQL detenido, cualquier opción de Clientes, Mercancías o Reportes: mensaje genérico de base de datos y la aplicación sigue.
+      20. Revisar `logs/transportes.log`: no aparece ningún NIF, CIF, nombre, dirección ni teléfono de las pruebas anteriores.
   - [ ] **Parte 4 · Envío y Reportes**
-    - [ ] `ReportesView` con RF-35, RF-36 y RF-37 conectados
+    - [ ] `ReportesView` con RF-36 conectado (RF-35 y RF-37 ya lo están desde la parte 3)
     - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya
   - [ ] Mensajes de éxito/error sin stack traces en todos los módulos (RF-39)
   - [ ] Verificación: prueba manual de flujo completo

@@ -72,7 +72,7 @@ public class Main {
         new MenuPrincipal(consola, manejador, List.of(
                 new VehiculoView(consola, manejador, vehiculoController, supervisorController),
                 new SupervisorView(consola, manejador, supervisorController),
-                new ClienteView(consola, manejador, clienteController),
+                new ClienteView(consola, manejador, clienteController, mercanciaController),
                 new MercanciaView(consola, manejador, mercanciaController, vehiculoController),
                 new EnvioView(consola, manejador, envioController, clienteController, mercanciaController),
                 new ReportesView(consola, manejador, mercanciaController, vehiculoController, clienteController)

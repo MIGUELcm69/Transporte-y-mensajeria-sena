@@ -12,8 +12,12 @@ import com.transportes.model.dao.VehiculoDao;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public class MercanciaController {
+
+    private static final String PRECIO_BLOQUEADO =
+            "No se puede modificar el precio de envío porque la mercancía ya tiene un envío asociado.";
 
     private final MercanciaDao mercanciaDao;
     private final VehiculoDao vehiculoDao;
@@ -38,8 +42,7 @@ public class MercanciaController {
         }
         if (actual.getPrecioEnvio().compareTo(mercancia.getPrecioEnvio()) != 0
                 && mercanciaDao.tieneEnvio(mercancia.getId())) {
-            throw new MercanciaConEnvioException(
-                    "No se puede modificar el precio de envío porque la mercancía ya tiene un envío asociado.");
+            throw new MercanciaConEnvioException(PRECIO_BLOQUEADO);
         }
         validarVehiculos(mercancia);
         if (!mercanciaDao.update(mercancia)) {
@@ -72,6 +75,25 @@ public class MercanciaController {
     /** RF-26. */
     public List<Mercancia> listarTodos() {
         return mercanciaDao.findAll();
+    }
+
+    /** RF-26: el motivo por el que el precio de envío no se puede modificar, o vacío si se puede. */
+    public Optional<String> bloqueoPrecioEnvio(int id) {
+        buscarPorId(id);
+        return mercanciaDao.tieneEnvio(id) ? Optional.of(PRECIO_BLOQUEADO) : Optional.empty();
+    }
+
+    /** RF-35: mercancías en las que el vehículo figura como vehículo, avión o vehículo de destino. */
+    public List<Mercancia> listarPorVehiculo(int vehiculoId) {
+        if (vehiculoDao.findById(vehiculoId).isEmpty()) {
+            throw new EntidadNoEncontradaException("un vehículo", vehiculoId);
+        }
+        return mercanciaDao.findByVehiculo(vehiculoId);
+    }
+
+    /** RF-37. */
+    public List<Mercancia> listarLargoRecorrido() {
+        return mercanciaDao.findLargoRecorrido();
     }
 
     /**
