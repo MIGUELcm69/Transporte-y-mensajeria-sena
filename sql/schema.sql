@@ -2,9 +2,18 @@
 -- schema.sql  —  Sistema de Transportes y Mensajería
 -- MySQL 8.3+  |  Script reproducible (RNF-17)
 -- Orden de ejecución: 1º schema.sql, 2º usuario.sql, 3º seed.sql
+-- Ejecutar con root u otro usuario con permisos de DDL (transportes_app no los tiene),
+-- desde MySQL Workbench o el cliente mysql (usa DELIMITER, no se puede lanzar por JDBC).
+-- Se puede ejecutar varias veces: borra y recrea tablas, triggers y procedimiento.
+-- Al repetirlo no hace falta volver a ejecutar usuario.sql (los permisos son sobre
+-- transportes_db.* y se conservan), pero sí seed.sql si se quieren datos de prueba.
 -- ADVERTENCIA: este script elimina todas las tablas y sus datos.
 -- Usar solo en entorno de desarrollo. No ejecutar en producción.
 -- ============================================================
+
+-- Los mensajes de los triggers llevan tildes: evita que un cliente con otra
+-- codificación por defecto (p. ej. la consola de Windows) los guarde mal.
+SET NAMES utf8mb4;
 
 CREATE DATABASE IF NOT EXISTS transportes_db
     CHARACTER SET utf8mb4
@@ -92,8 +101,8 @@ CREATE TABLE mercancia (
     codigo              VARCHAR(20)   NOT NULL,
     descripcion         VARCHAR(200)  NOT NULL,
     precio_envio        DECIMAL(12,2) NOT NULL,
-    asegurada           TINYINT(1)    NOT NULL DEFAULT 0,
-    largo_recorrido     TINYINT(1)    NOT NULL DEFAULT 0,
+    asegurada           TINYINT       NOT NULL DEFAULT 0,
+    largo_recorrido     TINYINT       NOT NULL DEFAULT 0,
     tipo                ENUM('SOBRE','PAQUETE') NOT NULL,
     peso                DECIMAL(10,3) NULL,
     largo               DECIMAL(10,2) NULL,
@@ -123,7 +132,7 @@ CREATE TABLE mercancia (
                           AND ancho IS NOT NULL AND ancho > 0
                           AND alto  IS NOT NULL AND alto  > 0)
     ),
-    -- Solo referencia columnas de la misma fila; si MySQL lo rechazara, mover a trg_mercancia_bi/bu
+    -- RF-23/RF-24; solo referencia columnas de la misma fila. También limita largo_recorrido a 0 o 1
     CONSTRAINT chk_mercancia_largo_recorrido CHECK (
         (largo_recorrido = 1 AND avion_id IS NOT NULL AND vehiculo_destino_id IS NOT NULL)
      OR (largo_recorrido = 0 AND avion_id IS NULL     AND vehiculo_destino_id IS NULL)

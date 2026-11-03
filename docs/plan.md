@@ -88,8 +88,8 @@ CHECK (
 | `codigo` | VARCHAR(20) | UNIQUE NOT NULL |
 | `descripcion` | VARCHAR(200) | NOT NULL |
 | `precio_envio` | DECIMAL(12,2) | NOT NULL, CHECK (precio_envio >= 0) |
-| `asegurada` | TINYINT(1) | NOT NULL DEFAULT 0 |
-| `largo_recorrido` | TINYINT(1) | NOT NULL DEFAULT 0 |
+| `asegurada` | TINYINT | NOT NULL DEFAULT 0, CHECK (asegurada IN (0, 1)) |
+| `largo_recorrido` | TINYINT | NOT NULL DEFAULT 0 (0 o 1 por el CHECK de largo recorrido) |
 | `tipo` | ENUM('SOBRE','PAQUETE') | NOT NULL |
 | `peso` | DECIMAL(10,3) | NULL |
 | `largo` | DECIMAL(10,2) | NULL |
@@ -110,8 +110,7 @@ CHECK (
                     AND alto  IS NOT NULL AND alto  > 0)
 )
 
--- Largo recorrido (referencia columnas FK, sin subconsulta — válido en MySQL 8)
--- Si MySQL lo rechaza en prueba, estas dos condiciones pasan a trg_mercancia_bi/bu.
+-- Largo recorrido (referencia columnas FK, sin subconsulta — aceptado por MySQL 8.3)
 CHECK (
   (largo_recorrido = 1 AND avion_id IS NOT NULL AND vehiculo_destino_id IS NOT NULL) OR
   (largo_recorrido = 0 AND avion_id IS NULL     AND vehiculo_destino_id IS NULL)
@@ -479,10 +478,10 @@ com.transportes
 
 **Orden de trabajo restante** (una sesión cada paso):
 1. ~~Correcciones de la revisión de seguridad (bloque siguiente).~~ Hecho.
-2. Etapa 7: `sql/consultas_control.sql` y test de integración de `ClienteDaoImpl.tieneEnvios` (Etapa 5). Escritos; pendientes de verificar.
-3. Etapa 8: `sql/schema.sql` final.
-4. Etapa 8: diagrama de clases.
-5. Etapa 8: manual de uso y README, cuando menús y scripts ya no cambien.
+2. Etapa 7: `sql/consultas_control.sql` y test de integración de `ClienteDaoImpl.tieneEnvios` (Etapa 5). Hecho y verificado.
+3. ~~Etapa 8: `sql/schema.sql` final.~~ Hecho y verificado.
+4. ~~Etapa 8: diagrama de clases.~~ Hecho.
+5. ~~Etapa 8: manual de uso y README, cuando menús y scripts ya no cambien.~~ Hecho.
 
 - [x] **Correcciones de la revisión de seguridad** (antes de la Etapa 7)
   - [x] `config.properties.example`: `db.url=jdbc:mysql://127.0.0.1:3306/transportes_db`, la base que crea `schema.sql`
@@ -494,7 +493,7 @@ com.transportes
     2. Comentar `db.password` en `config.properties` (sin `DB_PASSWORD` en el entorno): dos opciones seguidas que consulten muestran las dos veces `[ERROR] No se pudo cargar la configuración…`, no el mensaje genérico de base de datos. Restaurar la línea.
     3. Revisar `logs/transportes.log`: las líneas de excepciones inesperadas, si las hay, solo muestran `Excepción inesperada: <Tipo>`.
 
-- [ ] **Etapa 7 · Reportes**
+- [x] **Etapa 7 · Reportes**
   - [x] RF-35: mercancías asignadas a cada vehículo (Reportes, desde la Etapa 6 parte 3)
   - [x] RF-36: envíos por cliente y total facturado (Reportes, desde la Etapa 6 parte 4)
   - [x] RF-37: mercancías largo recorrido con avión asignado (Reportes, desde la Etapa 6 parte 3)
@@ -502,14 +501,21 @@ com.transportes
     - [x] Supervisores sin vehículos a cargo (RF-13)
     - [x] Clientes cuyo `total_facturado` no coincide con la suma de `precio_total` de los envíos que encargaron (RF-17)
     - [x] Envíos cuyo `precio_total` no coincide con la fórmula del plus según el tipo del destinatario y los intentos fallidos (RF-31/RF-32)
-  - [ ] Verificación: consultas con datos de `seed.sql` (las tres devuelven 0 filas)
-  - [ ] Verificación: `mvn -q verify` con `DB_URL` a `transportes_test`, incluidos los dos tests de `tieneEnvios`
+  - [x] Verificación: consultas con datos de `seed.sql` (las tres devuelven 0 filas)
+  - [x] Verificación: `mvn -q verify` con `DB_URL` a `transportes_test`, incluidos los dos tests de `tieneEnvios`
 
-- [ ] **Etapa 8 · Entregables finales**
-  - [ ] Diagrama de clases UML (RNF-13): actualizar `docs/diagrama-clases.md` con los paquetes `dao` y `controller` y las excepciones añadidas desde la Etapa 3
-  - [ ] Manual básico de uso (RNF-13)
-  - [ ] `README.md`: requisitos, orden de los scripts (`schema` → `usuario` → `seed`), configuración sin credenciales (variables de entorno o `config.properties` a partir del `.example`), cómo arrancar; cuándo y cómo se crea el esquema `transportes_test`, y aviso de que `TransaccionesJdbcIntegracionTest` solo se ejecuta si `DB_URL` termina en `/transportes_test` (si no, se omite)
-  - [ ] `sql/schema.sql` final reproducible (RNF-17)
+- [x] **Etapa 8 · Entregables finales**
+  - [x] Diagrama de clases UML (RNF-13): `docs/diagrama-clases.md` actualizado con un diagrama por capa (`model`, `exception`, `model.dao` y `config`, `controller`, `view`, `Main`), las excepciones `RegistroDuplicadoException`, `ClienteConEnviosException`, `UltimoVehiculoException` y `AccesoDatosException`, y la sección "Diferencias detectadas"
+  - [x] Manual básico de uso (RNF-13): `docs/manual-de-uso.md`
+  - [x] `README.md`: requisitos, orden de los scripts (`schema` → `usuario` → `seed`), configuración sin credenciales (variables de entorno o `config.properties` a partir del `.example`), cómo arrancar; cuándo y cómo se crea el esquema `transportes_test`, y aviso de que `TransaccionesJdbcIntegracionTest` solo se ejecuta si `DB_URL` termina en `/transportes_test` (si no, se omite)
+  - [x] `sql/schema.sql` final reproducible (RNF-17)
+    - [x] Cabecera revisada: orden de scripts, usuario con DDL, se puede repetir, advertencia de borrado; `SET NAMES utf8mb4` para los mensajes con tildes
+    - [x] `asegurada` y `largo_recorrido` como `TINYINT` (el DAO usa `getBoolean`/`setBoolean`, no depende de `TINYINT(1)`)
+    - [x] Mensajes de `SIGNAL` comprensibles y coincidentes con los esperados en `sql/pruebas_invalidas.sql`
+    - [x] Verificación: ejecutar `schema.sql` dos veces seguidas en Workbench sin errores
+    - [x] Verificación: después, `seed.sql` sin errores y las tres consultas de `sql/consultas_control.sql` sin errores
+    - [x] Verificación: la aplicación arranca y funciona sin errores con la base recreada
+    - [ ] Verificación pendiente de confirmar: `pruebas_invalidas.sql` (cada sentencia falla con el mensaje esperado) y que la aplicación lista mercancías con asegurada y largo recorrido correctos
 
 ---
 
@@ -535,7 +541,79 @@ com.transportes
 2. Teléfono del supervisor: NOT NULL.
 3. `precio_total` almacenado (no columna generada MySQL) para simplificar RF-36 y RF-33.
 4. Para `Sobre` largo_recorrido, `vehiculo_id` actúa como vehículo terrestre origen→aeropuerto (cumple RF-21 y RF-24 sin columna adicional).
-5. CHECK de largo_recorrido sobre columnas FK: si MySQL lo rechaza, se mueve a `trg_mercancia_bi/bu` y se indica en el script.
+5. CHECK de largo_recorrido sobre columnas FK: MySQL 8.3 lo acepta (comprobado en la Etapa 1), no hizo falta moverlo a `trg_mercancia_bi/bu`.
 6. `total_facturado` siempre se actualiza con SQL atómico incremental (`total_facturado + delta`), nunca con read-modify-write.
 7. En los controladores, comprobar una regla y después escribir (p. ej. contar los vehículos del supervisor y luego eliminar o reasignar un vehículo) no es atómico. Se acepta porque es una consola de un solo usuario; la BD sigue protegiendo la integridad con FK, UNIQUE y CHECK. `eliminarTraspasandoVehiculos` no lee la lista de vehículos: los mueve con un único `UPDATE ... WHERE supervisor_id = ?` (`VehiculoDao.reasignarSupervisor`) dentro de la misma transacción que el borrado; solo la comprobación previa de que origen y destino existen queda fuera.
 8. En `EnvioController.modificar`, `eliminar` y `registrarIntentoFallido`, el envío actual se lee dentro de la transacción con `EnvioDao.findById(id, Connection)`, y la diferencia de `total_facturado` se calcula a partir de esa lectura. **No se usa `SELECT ... FOR UPDATE`**: la lectura no bloquea la fila, así que dos operaciones concurrentes sobre el mismo envío podrían calcular el ajuste sobre el mismo valor anterior. Se acepta por el mismo motivo que el supuesto 7 (consola de un solo usuario). Las validaciones de clientes, mercancía y `tieneEnvio` usan su propia conexión.
+
+---
+
+## 7. Resumen final: dónde se cumple cada requisito
+
+Clases sin paquete: `model` (entidades), `controller` (`*Controller`, records) y `view` (`*View`, `Consola`, `Formulario*`). Los nombres SQL (tablas, `chk_*`, `fk_*`, `uq_*`, `trg_*`) están en `sql/schema.sql`.
+
+### Requerimientos funcionales
+
+| RF | Requisito | Dónde se cumple |
+|---|---|---|
+| RF-01 | Registrar vehículos | `VehiculoView.registrar` + `FormularioVehiculo.pedirNuevo` → `VehiculoController.registrar` → `VehiculoDao.save`; tabla `vehiculo` |
+| RF-02 | Tres tipos de vehículo | `TipoVehiculo`; `Moto`, `Furgoneta`, `Avion` heredan de `Vehiculo`; `vehiculo.tipo ENUM`; `trg_vehiculo_tipo_bu` impide cambiarlo |
+| RF-03 | Cilindrada de las motos | `Moto.cilindrada`; `chk_vehiculo_subtipo` |
+| RF-04 | Capacidad de las furgonetas | `Furgoneta.capacidad`; `chk_vehiculo_subtipo` |
+| RF-05 | Modificar vehículos | `VehiculoController.modificar` (código y tipo fijos); `VehiculoView.modificar` |
+| RF-06 | Eliminar sin mercancías asignadas | `VehiculoController.eliminar` con `VehiculoDao.tieneMercancias` (`VehiculoEnUsoException`); `fk_mercancia_vehiculo/avion/destino` RESTRICT |
+| RF-07 | Listar y consultar por código y por tipo | `VehiculoController.listarTodos`, `listarPorTipo`, `buscarPorCodigo`; `VehiculoView` |
+| RF-08 | Un único supervisor por vehículo | `Vehiculo.supervisorId` obligatorio; `vehiculo.supervisor_id NOT NULL` + `fk_vehiculo_supervisor` |
+| RF-09 | Registrar supervisores | `SupervisorController.registrar`; `SupervisorView.registrar`; `uq_supervisor_nif` |
+| RF-10 | Número de aviones por supervisor | `FichaSupervisor.numeroAviones()`, mostrado en `SupervisorView`; también `SupervisorController.contarAviones` → `SupervisorDao.contarAviones` (sin uso en la vista, ver diferencia 1 de `docs/diagrama-clases.md`) |
+| RF-11 | Modificar y eliminar supervisores | `SupervisorController.modificar`, `eliminar` (`SupervisorConVehiculosException`), `eliminarTraspasandoVehiculos`; `fk_vehiculo_supervisor` RESTRICT |
+| RF-12 | Listar y consultar con sus vehículos | `SupervisorController.listar`, `consultar` → `FichaSupervisor` |
+| RF-13 | Al menos un vehículo por supervisor | Alta conjunta en transacción (`SupervisorController.registrar`); `UltimoVehiculoException` en `VehiculoController.modificar/eliminar`; traspaso en una transacción; consulta 1 de `sql/consultas_control.sql` |
+| RF-14 | Cliente con código, fecha y total facturado | `Cliente`; `ClienteController.registrarParticular/registrarEmpresa` (fecha de alta con `Clock`, total 0 vía `ClienteParticular.nuevo`/`ClienteEmpresa.nuevo`) |
+| RF-15 | Particular y empresa | `ClienteParticular`, `ClienteEmpresa`, `TipoCliente`; `chk_cliente_subtipo`; `uq_cliente_nif`, `uq_cliente_cif` |
+| RF-16 | Modificar, eliminar, listar y consultar clientes | `ClienteController` (tipo y código fijos; `ClienteConEnviosException` con `ClienteDao.tieneEnvios`); `trg_cliente_tipo_bu`; `fk_envio_origen/destinatario` RESTRICT |
+| RF-17 | Total facturado automático | `EnvioController.crear/modificar/eliminar/registrarIntentoFallido` + `ClienteDao.sumarTotalFacturado` (`UPDATE` incremental) en la misma transacción; consulta 2 de `sql/consultas_control.sql` |
+| RF-18 | Historial de envíos del cliente | `ClienteController.historial` → `HistorialCliente`; `EnvioDao.findByCliente`; `ClienteView.mostrarHistorial` |
+| RF-19 | Datos de la mercancía | `Mercancia`; `FormularioMercancia.pedirNueva`; tabla `mercancia` |
+| RF-20 | Sobre (peso) o paquete (dimensiones) | `Sobre`, `Paquete`, `TipoMercancia`; `chk_mercancia_subtipo` |
+| RF-21 | Sobre → moto, paquete → furgoneta | `TipoMercancia.vehiculoTerrestre`; `MercanciaController.validarVehiculos` (`ReglaAsignacionException`); `sp_validar_mercancia` en `trg_mercancia_bi/bu` |
+| RF-22 | Vehículo con varias mercancías o ninguna | `mercancia.vehiculo_id` sin UNIQUE; RF-35 muestra "(sin mercancías)" |
+| RF-23 | Largo recorrido → avión obligatorio | `Mercancia.asignarVehiculos`; `chk_mercancia_largo_recorrido` |
+| RF-24 | Vehículos de origen y de destino | `Mercancia.vehiculoId` y `vehiculoDestinoId` (pueden coincidir, P-02); tipo comprobado en `MercanciaController` y `sp_validar_mercancia` |
+| RF-25 | Avión solo con mercancías de largo recorrido | `avion_id` solo con `largo_recorrido = 1` (`chk_mercancia_largo_recorrido`, `Mercancia.asignarVehiculos`); `avion_id` debe ser `AVION` y `vehiculo_id`/`vehiculo_destino_id` moto o furgoneta (`MercanciaController`, `sp_validar_mercancia`) |
+| RF-26 | Modificar, eliminar, listar y consultar mercancías | `MercanciaController` (precio de envío bloqueado y borrado impedido con envío: `MercanciaConEnvioException`; `bloqueoPrecioEnvio` para la vista); `fk_envio_mercancia` RESTRICT |
+| RF-27 | Registrar envíos | `EnvioController.crear`; `EnvioView.registrar` con `MercanciaController.listarSinEnvio`; `uq_envio_mercancia` (P-06) |
+| RF-28 | Destinatario empresa o particular | `envio.destinatario_id` FK a `cliente` (P-05) |
+| RF-29 | Envíos asociados al cliente que los encarga | `envio.cliente_origen_id NOT NULL` + FK (P-04); `EnvioDao.findByCliente` |
+| RF-30 | Intentos fallidos en envíos a particulares | `Envio.intentosFallidos`; `Envio.conIntentoFallido` y `conDatos`; `trg_envio_bi/bu`; `chk_envio_intentos` |
+| RF-31 | Plus de almacenaje | `Envio.calcularPlus`; `EnvioController.desglose`; consulta 3 de `sql/consultas_control.sql` |
+| RF-32 | Precio total | `Envio.calcularPrecioTotal` / `Envio.nuevo`; `DesgloseEnvio`; `chk_envio_precio` |
+| RF-33 | Nuevo intento fallido y recálculo | `EnvioController.registrarIntentoFallido` → `EnvioDao.actualizarIntentos`; `EnvioView.registrarIntentoFallido` |
+| RF-34 | Modificar, eliminar, listar y consultar envíos | `EnvioController.modificar`, `eliminar`, `listarTodos`, `buscarPorId`; `EnvioView` |
+| RF-35 | Mercancías de cada vehículo | `ReportesView.mercanciasPorVehiculo` → `MercanciaController.listarPorVehiculo` → `MercanciaDao.findByVehiculo` |
+| RF-36 | Envíos de un cliente y total facturado | `ReportesView.enviosDeCliente` → `ClienteView.mostrarHistorial` → `ClienteController.historial` |
+| RF-37 | Mercancías de largo recorrido con su avión | `ReportesView.largoRecorrido` → `MercanciaController.listarLargoRecorrido` → `MercanciaDao.findLargoRecorrido` |
+| RF-38 | Menú de consola por módulo | `MenuPrincipal` con seis `VistaModulo` (cinco módulos + Reportes); `Main` |
+| RF-39 | Mensajes claros de éxito o error | `Consola.exito` (`[OK]`) y `Consola.error` (`[ERROR]`); `ManejadorErrores`; mensajes de `TraductorErroresSql` y de los `SIGNAL` |
+
+### Requerimientos no funcionales
+
+| RNF | Requisito | Dónde se cumple |
+|---|---|---|
+| RNF-01 | Java 17+, IntelliJ, Maven | `pom.xml` (`maven.compiler.release` 17) |
+| RNF-02 | MVC | Paquetes `model` (+ `model.dao`), `view`, `controller`; además `config` y `exception`; `Main` como raíz de composición |
+| RNF-03 | MySQL con Workbench | `sql/schema.sql`, `usuario.sql`, `seed.sql`, `consultas_control.sql`, `pruebas_invalidas.sql` |
+| RNF-04 | Consola sin parte gráfica | `Consola` (`Scanner` + `PrintStream`) |
+| RNF-05 | Usabilidad | Menús numerados, `cancelar` en cualquier campo, Enter conserva al modificar, listas de vehículos y mercancías antes de pedir códigos; `docs/manual-de-uso.md` |
+| RNF-06 | Integridad de reglas de negocio | `Validacion` y entidades; guards de los controladores; CHECK, UNIQUE, FK y triggers |
+| RNF-07 | Entradas inválidas sin caída | `Consola` vuelve a preguntar ante tipos, fechas, negativos y vacíos (`ConsolaTest`) |
+| RNF-08 | Mantenibilidad, herencia y polimorfismo | Jerarquías `Vehiculo`, `Mercancia`, `Cliente`; DAO con mapeo por tipo (STI); `docs/diagrama-clases.md` |
+| RNF-09 | Extensibilidad | Controladores contra interfaces `*Dao` y `Transacciones`; `TipoMercancia.vehiculoTerrestre`; `switch` sin `default` en `FormularioVehiculo` y `FormularioMercancia` (el compilador señala dónde completar). Un tipo nuevo de mercancía exige cambiar también `sp_validar_mercancia` y los `ENUM`/CHECK de `schema.sql` |
+| RNF-10 | Rendimiento | Búsquedas por PK o UNIQUE; la vista guarda en un mapa los códigos ya buscados dentro de cada listado. Algunos listados hacen una consulta por fila (`MercanciaController.listarSinEnvio`, fichas de supervisor, RF-35), aceptable para volúmenes pequeños o medios. No se ha medido formalmente |
+| RNF-11 | Fiabilidad | `ManejadorErrores` en cada opción y en el menú principal; `FinDeEntrada`; `RegistroLog` sin `ConsoleHandler` |
+| RNF-12 | Portabilidad | Java puro con JDBC; rutas relativas (`logs/transportes.log`) |
+| RNF-13 | Documentación | `docs/requisitos.md`, `docs/diagrama-clases.md`, `docs/manual-de-uso.md`, `README.md` |
+| RNF-14 | JDBC con Connector/J | `mysql-connector-j` 9.7.0; `ConexionBD`; `SoporteJdbc` |
+| RNF-15 | Integridad referencial en la BD | PK, FK con RESTRICT, UNIQUE, NOT NULL y CHECK en `schema.sql`; seis triggers y `sp_validar_mercancia` |
+| RNF-16 | Seguridad | Solo `PreparedStatement` (`SoporteJdbc`); credenciales en variables de entorno o `config.properties` (en `.gitignore`, se entrega `.example`); usuario `transportes_app` solo con DML; mensajes sin detalles internos y log sin datos personales (`RegistroLog.FormatoLinea`, `ManejadorErrores`) |
+| RNF-17 | Script de respaldo | `sql/schema.sql` reproducible, ejecutado dos veces seguidas sin errores (Etapa 8) |
