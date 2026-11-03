@@ -6,6 +6,7 @@ import com.transportes.exception.MercanciaConEnvioException;
 import com.transportes.model.Cliente;
 import com.transportes.model.Envio;
 import com.transportes.model.Mercancia;
+import com.transportes.model.TipoCliente;
 import com.transportes.model.dao.ClienteDao;
 import com.transportes.model.dao.EnvioDao;
 import com.transportes.model.dao.MercanciaDao;
@@ -119,6 +120,17 @@ public class EnvioController {
     /** RF-34. */
     public List<Envio> listarTodos() {
         return envioDao.findAll();
+    }
+
+    /**
+     * RF-31 y RF-32. El plus lo calcula Envio con el precio de envío de la mercancía (que RF-26 deja fijo
+     * mientras tenga envío) y el tipo del destinatario; el precio total es el guardado en el envío.
+     */
+    public DesgloseEnvio desglose(Envio envio) {
+        BigDecimal precioBase = buscarMercancia(envio.getMercanciaId()).getPrecioEnvio();
+        TipoCliente tipoDestinatario = buscarCliente(envio.getDestinatarioId()).getTipo();
+        return new DesgloseEnvio(precioBase, envio.calcularPlus(precioBase, tipoDestinatario),
+                envio.getPrecioTotal());
     }
 
     private Envio buscarPorId(int id, Connection conexion) {

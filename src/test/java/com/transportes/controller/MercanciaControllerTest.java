@@ -174,6 +174,15 @@ class MercanciaControllerTest {
     }
 
     @Test
+    void listarSinEnvioExcluyeLasQueYaTienenEnvio() {
+        mercancias.sembrar(sobre("S-1", motoId));
+        asociarEnvio(mercancias.sembrar(sobre("S-2", motoId)));
+        mercancias.sembrar(paquete("P-1", furgonetaId));
+
+        assertEquals(List.of("S-1", "P-1"), codigos(controller.listarSinEnvio()));
+    }
+
+    @Test
     void listarPorVehiculoIncluyeLasMercanciasDondeFiguraEnCualquierTramo() {
         int otraMotoId = vehiculos.sembrar(moto("M-2", SUPERVISOR)).getId();
         mercancias.sembrar(sobre("S-1", motoId));

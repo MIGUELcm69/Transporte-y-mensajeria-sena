@@ -77,6 +77,11 @@ public class MercanciaController {
         return mercanciaDao.findAll();
     }
 
+    /** RF-27 y P-06: las mercancías que aún se pueden asignar a un envío. */
+    public List<Mercancia> listarSinEnvio() {
+        return mercanciaDao.findAll().stream().filter(m -> !mercanciaDao.tieneEnvio(m.getId())).toList();
+    }
+
     /** RF-26: el motivo por el que el precio de envío no se puede modificar, o vacío si se puede. */
     public Optional<String> bloqueoPrecioEnvio(int id) {
         buscarPorId(id);

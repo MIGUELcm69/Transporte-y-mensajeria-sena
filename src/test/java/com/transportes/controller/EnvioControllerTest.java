@@ -261,6 +261,33 @@ class EnvioControllerTest {
     }
 
     @Test
+    void desgloseDeUnEnvioAParticularSeparaPrecioBaseYPlus() {
+        DesgloseEnvio desglose = controller.desglose(controller.crear(ana, luis, sobreId, FECHA));
+
+        assertEquals(new BigDecimal("20.00"), desglose.precioBase());
+        assertEquals(new BigDecimal("0.80"), desglose.plus());
+        assertEquals(new BigDecimal("20.80"), desglose.precioTotal());
+    }
+
+    @Test
+    void desgloseTrasUnIntentoFallidoMuestraElNuevoPlus() {
+        Envio envio = controller.crear(ana, luis, sobreId, FECHA);
+
+        DesgloseEnvio desglose = controller.desglose(controller.registrarIntentoFallido(envio.getId()));
+
+        assertEquals(new BigDecimal("1.00"), desglose.plus());
+        assertEquals(new BigDecimal("21.00"), desglose.precioTotal());
+    }
+
+    @Test
+    void desgloseDeUnEnvioAEmpresaNoTienePlus() {
+        DesgloseEnvio desglose = controller.desglose(controller.crear(ana, acme, sobreId, FECHA));
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(desglose.plus()));
+        assertEquals(new BigDecimal("20.00"), desglose.precioTotal());
+    }
+
+    @Test
     void conEnvioNoSeCambiaElPrecioEnvioYElIntentoFallidoUsaElPrecioOriginal() {
         MercanciaController mercanciaController = new MercanciaController(mercancias, vehiculos);
         Envio envio = controller.crear(ana, luis, sobreId, FECHA);

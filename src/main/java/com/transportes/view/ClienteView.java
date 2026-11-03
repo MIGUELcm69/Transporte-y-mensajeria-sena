@@ -116,8 +116,16 @@ public class ClienteView extends VistaModulo {
         consola.mostrar(resumen(clienteController.buscarPorCodigo(consola.leerTextoNoVacio("Código de cliente"))));
     }
 
-    /** RF-18 y RF-36: envíos encargados como cliente origen, por fecha. Cada código se busca una sola vez. */
     private void historial() {
+        mostrarHistorial(consola, clienteController, mercanciaController);
+    }
+
+    /**
+     * RF-18 y RF-36: envíos encargados como cliente origen, por fecha. Cada código se busca una sola vez.
+     * También lo usa ReportesView.
+     */
+    static void mostrarHistorial(Consola consola, ClienteController clienteController,
+                                 MercanciaController mercanciaController) {
         Cliente cliente = clienteController.buscarPorCodigo(consola.leerTextoNoVacio("Código de cliente"));
         HistorialCliente historial = clienteController.historial(cliente.getId());
         consola.mostrar(resumen(historial.cliente()));

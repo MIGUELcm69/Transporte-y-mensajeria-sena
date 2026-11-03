@@ -263,8 +263,9 @@ com.transportes
 │   ├── SupervisorController.java    # transacción supervisor + primer vehículo; eliminar / eliminarTraspasandoVehiculos
 │   ├── HistorialCliente.java        # record: cliente + envíos encargados + totalFacturado() (RF-18, RF-36)
 │   ├── ClienteController.java       # registrarParticular/registrarEmpresa con Clock; guard de eliminación con envíos
-│   ├── MercanciaController.java     # guard de precio_envio si hay envío (y bloqueoPrecioEnvio para la vista); tipos de vehículo vía TipoMercancia; RF-35, RF-37
-│   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos)
+│   ├── MercanciaController.java     # guard de precio_envio si hay envío (y bloqueoPrecioEnvio para la vista); tipos de vehículo vía TipoMercancia; RF-35, RF-37; listarSinEnvio
+│   ├── DesgloseEnvio.java           # record: precioBase, plus, precioTotal de un envío (RF-31, RF-32)
+│   └── EnvioController.java        # invoca Envio.nuevo/conIntentoFallido; transacción total_facturado (crear/modificar/eliminar/intentos); desglose
 ├── view/
 │   ├── Consola.java                 # Consola(Scanner, PrintStream): elegirOpcion, leerEntero, leerDecimal(Rango), leerFecha, leerFechaOHoy,
 │   │                                #   leerTextoNoVacio, confirmar y variantes …OActual (Enter conserva); "cancelar" en un campo
@@ -419,15 +420,15 @@ com.transportes
       15. Supervisores → Modificar: cambiar el teléfono; cambiar el NIF a uno de otro supervisor → `[ERROR] Ya existe un supervisor con ese NIF.`
       16. Con MySQL detenido, cualquier opción que consulte: `[ERROR] No se pudo completar la operación en la base de datos. Compruebe que el servidor MySQL esté activo e inténtelo de nuevo.` y la aplicación sigue.
       17. Revisar `logs/transportes.log`: no aparece ningún NIF, nombre, dirección ni teléfono de las pruebas anteriores.
-  - [ ] **Parte 3 · Cliente y Mercancía**
-    - [ ] `MercanciaController.listarPorVehiculo` y `listarLargoRecorrido` (RF-35, RF-37) con sus tests
-    - [ ] `MercanciaController.bloqueoPrecioEnvio(id)`: devuelve el mismo mensaje con el que `modificar` rechaza el cambio de precio (RF-26), para que la vista no pregunte el precio y muestre ese mensaje
-    - [ ] `ClienteView`: registrar particular y empresa (sin fecha de alta ni total facturado: los pone el controlador), modificar (código y tipo no se piden; Enter conserva), eliminar con confirmación, listar, consultar por código, historial de envíos con su total (RF-14 a RF-18). Recibe `MercanciaController` para mostrar el código de la mercancía de cada envío
-    - [ ] `MercanciaView`: registrar, modificar (código y tipo fijos; Enter conserva, también los vehículos; precio bloqueado si tiene envío), eliminar con confirmación, listar, consultar por código (RF-19 a RF-26). Antes de pedir cada vehículo lista los del tipo adecuado (`TipoMercancia.vehiculoTerrestre()` o AVION); si no hay ninguno, cancela la operación. El tipo lo vuelve a comprobar el controlador
-    - [ ] `FormularioMercancia` (interno de `view`): tipo, datos comunes, medidas propias, vehículos mediante un `SelectorVehiculo`, resumen y tramos en una línea; `switch` sobre `TipoMercancia` sin `default`
-    - [ ] `ReportesView`: RF-35 (cada vehículo con sus mercancías, también como avión o vehículo de destino) y RF-37 (largo recorrido con su avión)
-    - [ ] Tests: `FormularioMercanciaTest`; casos nuevos en `MercanciaControllerTest`
-    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+  - [x] **Parte 3 · Cliente y Mercancía**
+    - [x] `MercanciaController.listarPorVehiculo` y `listarLargoRecorrido` (RF-35, RF-37) con sus tests
+    - [x] `MercanciaController.bloqueoPrecioEnvio(id)`: devuelve el mismo mensaje con el que `modificar` rechaza el cambio de precio (RF-26), para que la vista no pregunte el precio y muestre ese mensaje
+    - [x] `ClienteView`: registrar particular y empresa (sin fecha de alta ni total facturado: los pone el controlador), modificar (código y tipo no se piden; Enter conserva), eliminar con confirmación, listar, consultar por código, historial de envíos con su total (RF-14 a RF-18). Recibe `MercanciaController` para mostrar el código de la mercancía de cada envío
+    - [x] `MercanciaView`: registrar, modificar (código y tipo fijos; Enter conserva, también los vehículos; precio bloqueado si tiene envío), eliminar con confirmación, listar, consultar por código (RF-19 a RF-26). Antes de pedir cada vehículo lista los del tipo adecuado (`TipoMercancia.vehiculoTerrestre()` o AVION); si no hay ninguno, cancela la operación. El tipo lo vuelve a comprobar el controlador
+    - [x] `FormularioMercancia` (interno de `view`): tipo, datos comunes, medidas propias, vehículos mediante un `SelectorVehiculo`, resumen y tramos en una línea; `switch` sobre `TipoMercancia` sin `default`
+    - [x] `ReportesView`: RF-35 (cada vehículo con sus mercancías, también como avión o vehículo de destino) y RF-37 (largo recorrido con su avión)
+    - [x] Tests: `FormularioMercanciaTest`; casos nuevos en `MercanciaControllerTest`
+    - [x] Comprobaciones manuales (con los datos de `seed.sql` cargados):
       1. Clientes → Registrar particular: no pide fecha ni total facturado; el mensaje de éxito muestra la fecha de alta de hoy y en Consultar por código sale `total facturado 0.00`.
       2. Clientes → Registrar empresa: pide CIF, nombre, dirección y teléfono; mismo resultado que el paso 1.
       3. Registrar un cliente con un código, NIF o CIF ya existente: `[ERROR] Ya existe…` y vuelve al menú de Clientes; repetirlo con datos libres funciona (objetos nuevos en cada intento).
@@ -449,8 +450,30 @@ com.transportes
       19. Con MySQL detenido, cualquier opción de Clientes, Mercancías o Reportes: mensaje genérico de base de datos y la aplicación sigue.
       20. Revisar `logs/transportes.log`: no aparece ningún NIF, CIF, nombre, dirección ni teléfono de las pruebas anteriores.
   - [ ] **Parte 4 · Envío y Reportes**
-    - [ ] `ReportesView` con RF-36 conectado (RF-35 y RF-37 ya lo están desde la parte 3)
-    - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya
+    - [ ] `MercanciaController.listarSinEnvio()` (RF-27, P-06): `findAll` filtrado con `tieneEnvio`, sin SQL nuevo
+    - [ ] `EnvioController.desglose(envio)` → record `DesgloseEnvio(precioBase, plus, precioTotal)`: el plus lo calcula `Envio.calcularPlus` con el precio de envío de la mercancía y el tipo del destinatario; el total es el guardado (RF-31, RF-32)
+    - [ ] `EnvioView`: registrar (códigos de origen, destinatario y mercancía; antes de la mercancía lista las que no tienen envío y, si no hay ninguna, cancela sin pedir nada; fecha con Enter = hoy; muestra precio base, plus y total), modificar (Enter conserva cada dato; el precio no se pide y se muestra el recalculado), eliminar con confirmación, registrar intento fallido (muestra el nuevo plus y el nuevo total), listar, consultar por id con su desglose (RF-27 a RF-34)
+    - [ ] `ReportesView` con RF-36 conectado (RF-35 y RF-37 ya lo están desde la parte 3): llama a `ClienteView.mostrarHistorial`, el mismo que Clientes → Historial, que usa `ClienteController.historial`
+    - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya. `Main` ya solo contiene la composición y el arranque
+    - [ ] Tests: casos de `desglose` en `EnvioControllerTest` (particular, tras un intento, empresa) y de `listarSinEnvio` en `MercanciaControllerTest`
+    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+      1. Envíos → Registrar con origen y destinatario particulares: antes del código de la mercancía lista solo las que no tienen envío (las de los envíos de `seed.sql` no salen). Enter en la fecha muestra "Se usa la fecha de hoy: dd/mm/aaaa.". Al terminar muestra el id, el precio base, el plus (4 % del precio base) y el precio total.
+      2. Registrar a un destinatario EMPRESA: plus `0.00` y precio total igual al precio base. En Clientes → Consultar, el total facturado del cliente origen ha subido exactamente el precio total.
+      3. Registrar escribiendo una fecha (`15/03/2026`) en vez de Enter: el envío queda con esa fecha (Consultar por id). Fecha `31/02/2026` o `abc`: vuelve a preguntar.
+      4. Registrar con el mismo código como origen y destinatario: `[ERROR] El cliente origen y el destinatario deben ser distintos.` y vuelve al menú de Envíos. Repetirlo con datos correctos funciona (objetos nuevos en cada intento).
+      5. Registrar con el código de una mercancía que ya tiene envío: `[ERROR] La mercancía ya tiene un envío registrado.`. Código de cliente o de mercancía inexistente: `[ERROR] No existe…`.
+      6. Con todas las mercancías ya asignadas a un envío: Registrar dice "No hay mercancías sin envío…", "Operación cancelada." y no pide ningún dato.
+      7. Envíos → Registrar intento fallido sobre un envío a particular: muestra cuántos intentos lleva, el nuevo plus (5 %, 6 %… del precio base) y el nuevo total; el total facturado del origen sube la diferencia. Sobre un envío a empresa: `[ERROR] Solo se registran intentos fallidos en envíos a particulares.`.
+      8. Envíos → Modificar: Enter en todo deja los datos y el precio igual. Cambiar la fecha funciona. Cambiar la mercancía por otra sin envío (de las listadas) recalcula el precio y el total facturado del origen; la mercancía anterior vuelve a salir como libre al registrar.
+      9. Envíos → Modificar cambiando el cliente origen: el anterior baja su total facturado y el nuevo lo sube (Clientes → Consultar los dos).
+      10. Envíos → Modificar un envío con intentos fallidos poniendo de destinatario una empresa: `[ERROR] Este envío ya registró … intento(s) …` y el envío queda igual.
+      11. Envíos → Eliminar: `n` no borra; `s` borra y el total facturado del origen baja el precio total del envío. Id inexistente (`9999`): `[ERROR] No existe un envío…`. Id `0`, `-1` o `abc`: vuelve a preguntar.
+      12. Envíos → Listar: cada línea muestra id, fecha, códigos de origen, destinatario y mercancía, intentos y total. Consultar por id añade el precio base, el plus y el total.
+      13. `cancelar` en cualquier campo de Registrar o Modificar: "Operación cancelada." y no se guarda nada.
+      14. Reportes → Envíos de un cliente y su total facturado: mismo resultado que Clientes → Historial para el mismo código (también para uno sin envíos y uno inexistente).
+      15. Con MySQL detenido, cualquier opción de Envíos o Reportes: mensaje genérico de base de datos y la aplicación sigue.
+      16. Revisar `logs/transportes.log`: no aparece ningún NIF, CIF, nombre, dirección ni teléfono de las pruebas anteriores.
+      17. `PruebaLectura` ya no aparece en el proyecto y `Main` arranca igual que antes.
   - [ ] Mensajes de éxito/error sin stack traces en todos los módulos (RF-39)
   - [ ] Verificación: prueba manual de flujo completo
 

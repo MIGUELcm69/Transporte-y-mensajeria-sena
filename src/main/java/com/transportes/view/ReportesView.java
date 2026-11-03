@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** RF-35 a RF-37. RF-36 se conecta en la parte 4 de la Etapa 6. */
+/** RF-35 a RF-37. */
 public class ReportesView extends VistaModulo {
 
     private final MercanciaController mercanciaController;
@@ -35,7 +35,13 @@ public class ReportesView extends VistaModulo {
     protected List<Opcion> opciones() {
         return List.of(
                 new Opcion("Mercancías asignadas a cada vehículo", this::mercanciasPorVehiculo),
+                new Opcion("Envíos de un cliente y su total facturado", this::enviosDeCliente),
                 new Opcion("Mercancías de largo recorrido con su avión", this::largoRecorrido));
+    }
+
+    /** RF-36: el mismo historial que Clientes, a partir de ClienteController.historial. */
+    private void enviosDeCliente() {
+        ClienteView.mostrarHistorial(consola, clienteController, mercanciaController);
     }
 
     /** RF-35 (y RF-22: un vehículo puede no tener ninguna). */
