@@ -168,6 +168,28 @@ class TransaccionesJdbcIntegracionTest {
         assertTotal(totalAntes.toPlainString(), e.origen());
     }
 
+    // ----- ClienteDaoImpl.tieneEnvios -----
+
+    @Test
+    void tieneEnviosDetectaAlClienteComoOrigenYComoDestinatario() {
+        Escenario e = sembrarEscenario();
+        envioController.crear(e.origen(), e.destinatario(), e.sobre(), FECHA);
+
+        assertTrue(clienteDao.tieneEnvios(e.origen()));
+        assertTrue(clienteDao.tieneEnvios(e.destinatario()));
+    }
+
+    @Test
+    void tieneEnviosEsFalsoParaUnClienteQueNoFiguraEnNingunEnvio() {
+        Escenario e = sembrarEscenario();
+        int ajeno = sembrarParticular("CLI-3", "55555555E");
+
+        assertFalse(clienteDao.tieneEnvios(e.origen()));
+        envioController.crear(e.origen(), e.destinatario(), e.sobre(), FECHA);
+
+        assertFalse(clienteDao.tieneEnvios(ajeno));
+    }
+
     // ----- Datos de apoyo -----
 
     /**

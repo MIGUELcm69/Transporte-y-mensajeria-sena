@@ -6,8 +6,8 @@
 # sobre las claves de este archivo si están definidas en el sistema.
 
 # URL JDBC de la base de datos.
-# Ejemplo: jdbc:mysql://localhost:3306/transportes
-db.url=jdbc:mysql://localhost:3306/transportes
+# Base de datos creada por sql/schema.sql (transportes_db).
+db.url=jdbc:mysql://127.0.0.1:3306/transportes_db
 
 # Usuario de la base de datos (creado en sql/usuario.sql).
 db.usuario=transportes_app

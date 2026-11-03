@@ -221,7 +221,7 @@ Columnas `DECIMAL(x,2)` en BD: la escala Java siempre coincide con la BD.
 com.transportes
 ├── Main.java                        # raíz de composición: configura el log, crea DAO, TransaccionesJdbc, controladores y vistas; arranca MenuPrincipal
 ├── config/
-│   ├── ConexionBD.java              # Utilidad estática, no Singleton: carga la configuración (entorno o config.properties) al llamar a getConnection()
+│   ├── ConexionBD.java              # getConnection() estático: carga la configuración (entorno o config.properties) y solo la guarda si están los tres valores
 │   └── RegistroLog.java             # configurar(): FileHandler único en logs/transportes.log, sin rotación ni ConsoleHandler; FormatoLinea
 ├── model/
 │   ├── Vehiculo.java                # Abstract
@@ -313,7 +313,7 @@ com.transportes
 **Regla del log: nunca escribe datos personales** (NIF, CIF, nombres, direcciones, teléfonos).
 - Solo se registran el tipo de excepción y un mensaje sin datos del usuario; nunca la excepción adjunta ni su traza.
 - `RegistroLog.FormatoLinea` lo garantiza para cualquier llamada: de la excepción adjunta solo escribe su tipo, porque el mensaje de MySQL (p. ej. `Duplicate entry '<NIF>'`) puede contener datos.
-- `ManejadorErrores` no registra las `DomainException`: su mensaje puede incluir el identificador buscado (p. ej. un NIF). Registra tipo y mensaje de `ConfiguracionException`, `AccesoDatosException` y de las excepciones inesperadas.
+- `ManejadorErrores` no registra las `DomainException`: su mensaje puede incluir el identificador buscado (p. ej. un NIF). Registra tipo y mensaje de `ConfiguracionException` y `AccesoDatosException`, cuyos mensajes redacta la aplicación sin datos del usuario. De las excepciones inesperadas registra **solo el tipo**, porque su mensaje no lo controla la aplicación.
 - Al crear un mensaje de log nuevo, no concatenar valores introducidos por el usuario.
 
 ---
@@ -357,7 +357,7 @@ com.transportes
   - [x] Traducción de `SQLException` (1062, 3819, 1644, 1451, 1452, 1264, resto) con log `java.util.logging`
   - [x] Verificación: `mvn -q verify` + test de conexión manual
 
-- [ ] **Etapa 5 · Capa Controller**
+- [x] **Etapa 5 · Capa Controller**
   - [x] CRUD por módulo (Vehiculo, Supervisor, Cliente, Mercancia); guards de eliminación (RF-06, RF-11)
   - [x] CRUD de Envio (cubierto por las casillas de `EnvioController`)
   - [x] Guard en `MercanciaController`: rechaza modificar `precio_envio` si `tieneEnvio = true`
@@ -374,12 +374,12 @@ com.transportes
   - [x] `SupervisorController`: exponer el conteo de aviones por supervisor (RF-10)
   - [x] `SupervisorController.eliminarTraspasandoVehiculos(id, supervisorDestinoId)`: destino existente y distinto; mover vehículos y borrar en una transacción. `eliminar(id)` solo para supervisores sin vehículos (RF-11, RF-13)
   - [x] Parte final: test de integración de `TransaccionesJdbc` y de las operaciones transaccionales contra el esquema `transportes_test`
-  - [ ] Test de integración del SQL de `ClienteDaoImpl.tieneEnvios` (cliente como origen y como destinatario)
+  - [x] Test de integración del SQL de `ClienteDaoImpl.tieneEnvios` (cliente como origen y como destinatario), en `TransaccionesJdbcIntegracionTest`
   - [x] Verificación: `mvn -q verify` + tests JUnit 5 de reglas de negocio críticas
     - Reglas de los controladores: con DAO falsos en memoria que implementan las interfaces `*Dao`
     - Transacciones: contra un esquema aparte `transportes_test`, nunca contra `transportes_db`
 
-- [ ] **Etapa 6 · Capa View**
+- [x] **Etapa 6 · Capa View**
   - Decisiones: `OperacionCancelada` unchecked y fuera de `DomainException`; tras un error de dominio en un formulario se vuelve al menú del módulo; fechas `dd/MM/aaaa` (solo en *registrar envío* Enter = hoy, y se muestra); en *modificar*, Enter conserva el valor actual.
   - [x] **Parte 1 · Consola, log y Main**
     - [x] `Consola.java`: validación de tipos, fechas, rangos; nunca se propaga excepción al menú
@@ -449,14 +449,14 @@ com.transportes
       18. Reportes → Mercancías de largo recorrido: solo salen las de largo recorrido, cada una con la línea `Avión:` y sus tres vehículos.
       19. Con MySQL detenido, cualquier opción de Clientes, Mercancías o Reportes: mensaje genérico de base de datos y la aplicación sigue.
       20. Revisar `logs/transportes.log`: no aparece ningún NIF, CIF, nombre, dirección ni teléfono de las pruebas anteriores.
-  - [ ] **Parte 4 · Envío y Reportes**
-    - [ ] `MercanciaController.listarSinEnvio()` (RF-27, P-06): `findAll` filtrado con `tieneEnvio`, sin SQL nuevo
-    - [ ] `EnvioController.desglose(envio)` → record `DesgloseEnvio(precioBase, plus, precioTotal)`: el plus lo calcula `Envio.calcularPlus` con el precio de envío de la mercancía y el tipo del destinatario; el total es el guardado (RF-31, RF-32)
-    - [ ] `EnvioView`: registrar (códigos de origen, destinatario y mercancía; antes de la mercancía lista las que no tienen envío y, si no hay ninguna, cancela sin pedir nada; fecha con Enter = hoy; muestra precio base, plus y total), modificar (Enter conserva cada dato; el precio no se pide y se muestra el recalculado), eliminar con confirmación, registrar intento fallido (muestra el nuevo plus y el nuevo total), listar, consultar por id con su desglose (RF-27 a RF-34)
-    - [ ] `ReportesView` con RF-36 conectado (RF-35 y RF-37 ya lo están desde la parte 3): llama a `ClienteView.mostrarHistorial`, el mismo que Clientes → Historial, que usa `ClienteController.historial`
-    - [ ] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya. `Main` ya solo contiene la composición y el arranque
-    - [ ] Tests: casos de `desglose` en `EnvioControllerTest` (particular, tras un intento, empresa) y de `listarSinEnvio` en `MercanciaControllerTest`
-    - [ ] Comprobaciones manuales (con los datos de `seed.sql` cargados):
+  - [x] **Parte 4 · Envío y Reportes**
+    - [x] `MercanciaController.listarSinEnvio()` (RF-27, P-06): `findAll` filtrado con `tieneEnvio`, sin SQL nuevo
+    - [x] `EnvioController.desglose(envio)` → record `DesgloseEnvio(precioBase, plus, precioTotal)`: el plus lo calcula `Envio.calcularPlus` con el precio de envío de la mercancía y el tipo del destinatario; el total es el guardado (RF-31, RF-32)
+    - [x] `EnvioView`: registrar (códigos de origen, destinatario y mercancía; antes de la mercancía lista las que no tienen envío y, si no hay ninguna, cancela sin pedir nada; fecha con Enter = hoy; muestra precio base, plus y total), modificar (Enter conserva cada dato; el precio no se pide y se muestra el recalculado), eliminar con confirmación, registrar intento fallido (muestra el nuevo plus y el nuevo total), listar, consultar por id con su desglose (RF-27 a RF-34)
+    - [x] `ReportesView` con RF-36 conectado (RF-35 y RF-37 ya lo están desde la parte 3): llama a `ClienteView.mostrarHistorial`, el mismo que Clientes → Historial, que usa `ClienteController.historial`
+    - [x] Eliminar `PruebaLectura.java` (prueba manual de la Etapa 4) cuando la vista la sustituya. `Main` ya solo contiene la composición y el arranque
+    - [x] Tests: casos de `desglose` en `EnvioControllerTest` (particular, tras un intento, empresa) y de `listarSinEnvio` en `MercanciaControllerTest`
+    - [x] Comprobaciones manuales (con los datos de `seed.sql` cargados):
       1. Envíos → Registrar con origen y destinatario particulares: antes del código de la mercancía lista solo las que no tienen envío (las de los envíos de `seed.sql` no salen). Enter en la fecha muestra "Se usa la fecha de hoy: dd/mm/aaaa.". Al terminar muestra el id, el precio base, el plus (4 % del precio base) y el precio total.
       2. Registrar a un destinatario EMPRESA: plus `0.00` y precio total igual al precio base. En Clientes → Consultar, el total facturado del cliente origen ha subido exactamente el precio total.
       3. Registrar escribiendo una fecha (`15/03/2026`) en vez de Enter: el envío queda con esa fecha (Consultar por id). Fecha `31/02/2026` o `abc`: vuelve a preguntar.
@@ -474,19 +474,41 @@ com.transportes
       15. Con MySQL detenido, cualquier opción de Envíos o Reportes: mensaje genérico de base de datos y la aplicación sigue.
       16. Revisar `logs/transportes.log`: no aparece ningún NIF, CIF, nombre, dirección ni teléfono de las pruebas anteriores.
       17. `PruebaLectura` ya no aparece en el proyecto y `Main` arranca igual que antes.
-  - [ ] Mensajes de éxito/error sin stack traces en todos los módulos (RF-39)
-  - [ ] Verificación: prueba manual de flujo completo
+  - [x] Mensajes de éxito/error sin stack traces en todos los módulos (RF-39)
+  - [x] Verificación: prueba manual de flujo completo
+
+**Orden de trabajo restante** (una sesión cada paso):
+1. ~~Correcciones de la revisión de seguridad (bloque siguiente).~~ Hecho.
+2. Etapa 7: `sql/consultas_control.sql` y test de integración de `ClienteDaoImpl.tieneEnvios` (Etapa 5). Escritos; pendientes de verificar.
+3. Etapa 8: `sql/schema.sql` final.
+4. Etapa 8: diagrama de clases.
+5. Etapa 8: manual de uso y README, cuando menús y scripts ya no cambien.
+
+- [x] **Correcciones de la revisión de seguridad** (antes de la Etapa 7)
+  - [x] `config.properties.example`: `db.url=jdbc:mysql://127.0.0.1:3306/transportes_db`, la base que crea `schema.sql`
+  - [x] `ConexionBD`: carga los tres valores y los guarda a la vez; si falta alguno no guarda nada y cada `getConnection()` lanza `ConfiguracionException` sin intentar conectar con `null`. Entorno, archivo y conector inyectables por un constructor interno del paquete
+  - [x] `ManejadorErrores`: de las excepciones inesperadas solo registra el tipo (regla del log, sección 4)
+  - [x] Tests: `ConexionBDTest` (configuración incompleta dos veces → `ConfiguracionException` con el mismo mensaje y sin conectar; configuración completa con prioridad del entorno); `ManejadorErroresTest` actualizado
+  - [x] Comprobaciones manuales:
+    1. Con `config.properties` completo, `Main` arranca y cualquier listado funciona igual que antes.
+    2. Comentar `db.password` en `config.properties` (sin `DB_PASSWORD` en el entorno): dos opciones seguidas que consulten muestran las dos veces `[ERROR] No se pudo cargar la configuración…`, no el mensaje genérico de base de datos. Restaurar la línea.
+    3. Revisar `logs/transportes.log`: las líneas de excepciones inesperadas, si las hay, solo muestran `Excepción inesperada: <Tipo>`.
 
 - [ ] **Etapa 7 · Reportes**
-  - [ ] RF-35: mercancías asignadas a cada vehículo
-  - [ ] RF-36: envíos por cliente y total facturado
-  - [ ] RF-37: mercancías largo recorrido con avión asignado
-  - [ ] `sql/consultas_control.sql`: consulta de supervisores sin vehículos a cargo (control de RF-13)
-  - [ ] Verificación: consultas con datos de `seed.sql`
+  - [x] RF-35: mercancías asignadas a cada vehículo (Reportes, desde la Etapa 6 parte 3)
+  - [x] RF-36: envíos por cliente y total facturado (Reportes, desde la Etapa 6 parte 4)
+  - [x] RF-37: mercancías largo recorrido con avión asignado (Reportes, desde la Etapa 6 parte 3)
+  - [x] `sql/consultas_control.sql`: tres consultas de solo lectura; cada una devuelve 0 filas con una base sana, y una cabecera en el script lo explica. Resultados solo con ids, códigos e importes (sin datos personales)
+    - [x] Supervisores sin vehículos a cargo (RF-13)
+    - [x] Clientes cuyo `total_facturado` no coincide con la suma de `precio_total` de los envíos que encargaron (RF-17)
+    - [x] Envíos cuyo `precio_total` no coincide con la fórmula del plus según el tipo del destinatario y los intentos fallidos (RF-31/RF-32)
+  - [ ] Verificación: consultas con datos de `seed.sql` (las tres devuelven 0 filas)
+  - [ ] Verificación: `mvn -q verify` con `DB_URL` a `transportes_test`, incluidos los dos tests de `tieneEnvios`
 
 - [ ] **Etapa 8 · Entregables finales**
   - [ ] Diagrama de clases UML (RNF-13): actualizar `docs/diagrama-clases.md` con los paquetes `dao` y `controller` y las excepciones añadidas desde la Etapa 3
   - [ ] Manual básico de uso (RNF-13)
+  - [ ] `README.md`: requisitos, orden de los scripts (`schema` → `usuario` → `seed`), configuración sin credenciales (variables de entorno o `config.properties` a partir del `.example`), cómo arrancar; cuándo y cómo se crea el esquema `transportes_test`, y aviso de que `TransaccionesJdbcIntegracionTest` solo se ejecuta si `DB_URL` termina en `/transportes_test` (si no, se omite)
   - [ ] `sql/schema.sql` final reproducible (RNF-17)
 
 ---

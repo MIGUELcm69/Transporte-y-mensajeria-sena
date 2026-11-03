@@ -10,8 +10,9 @@ import java.util.logging.Logger;
 
 /**
  * Único punto donde una excepción se convierte en mensaje para el usuario. Ninguna llega a la consola
- * con stack trace. Al log solo van tipo y mensaje; los errores de dominio no se registran, porque su
- * mensaje puede incluir datos personales (p. ej. el NIF buscado).
+ * con stack trace. Al log van tipo y mensaje de los errores de configuración y de acceso a datos, y solo
+ * el tipo de las excepciones inesperadas; los errores de dominio no se registran, porque su mensaje puede
+ * incluir datos personales (p. ej. el NIF buscado).
  */
 public class ManejadorErrores {
 
@@ -46,7 +47,8 @@ public class ManejadorErrores {
             registrar(e);
             consola.error(MENSAJE_ACCESO_DATOS);
         } catch (RuntimeException e) {
-            registrar(e);
+            // Su mensaje no lo redacta esta aplicación y podría incluir datos introducidos por el usuario.
+            LOG.log(Level.SEVERE, "Excepción inesperada: " + e.getClass().getSimpleName());
             consola.error(MENSAJE_INESPERADO);
         }
     }

@@ -107,16 +107,16 @@ class ManejadorErroresTest {
     }
 
     @Test
-    void excepcionInesperadaMuestraMensajeGenericoYRegistraTipoYMensaje() {
+    void excepcionInesperadaMuestraMensajeGenericoYRegistraSoloElTipo() {
         manejador.ejecutar(() -> {
-            throw new IllegalStateException("detalle interno");
+            throw new IllegalStateException("valor introducido 12345678A");
         });
 
         assertTrue(salida().contains(ManejadorErrores.MENSAJE_INESPERADO));
-        assertFalse(salida().contains("detalle interno"));
+        assertFalse(salida().contains("12345678A"));
         assertSinDetallesTecnicos();
         assertEquals(1, registros.size());
-        assertEquals("IllegalStateException: detalle interno", registros.get(0).getMessage());
+        assertEquals("Excepción inesperada: IllegalStateException", registros.get(0).getMessage());
         assertNull(registros.get(0).getThrown());
     }
 
